@@ -1,20 +1,10 @@
-import java.nio.{ByteBuffer, ByteOrder}
+import java.io.{File, FileInputStream}
+import java.nio.{ByteBuffer, ByteOrder, MappedByteBuffer}
 import java.nio.file.{Files, Paths}
+import java.nio.channels.FileChannel.MapMode._
 
 case class Wad(wadType: String, numLumps: Int, levels: List[Level]) {
   override def toString: String = "[Wad] type: " + wadType + ", lumps: " + numLumps + ", levels: " + levels
-}
-
-case class Lump(name: String, data: List[Byte]) {
-  override def toString: String = "[Lump] name: " + name
-}
-
-case class WadLine(a: Vertex, b: Vertex, oneSided: Boolean) {
-  override def toString: String = s"[Line] $a <-> $b, oneSided: $oneSided"
-}
-
-case class Vertex(x: Int, y: Int) {
-  override def toString: String = s"($x, $y)"
 }
 
 case class Level(name: String, lumps: Map[String, Lump], lines: Option[List[WadLine]]=None){
@@ -30,8 +20,29 @@ case class Level(name: String, lumps: Map[String, Lump], lines: Option[List[WadL
   override def toString: String = "[Level] name: " + name
 }
 
+case class Lump(name: String, data: List[Byte]) {
+  override def toString: String = "[Lump] name: " + name
+}
+
+case class WadLine(a: Vertex, b: Vertex, oneSided: Boolean) {
+  override def toString: String = s"[Line] $a <-> $b, oneSided: $oneSided"
+}
+
+case class Vertex(x: Int, y: Int) {
+  override def toString: String = s"($x, $y)"
+}
+
 object WadParser {
   val HEADER_SIZE = 12
+
+  def createStreamFromFile(): MappedByteBuffer = {
+    val file = new File("C:\\Users\\neil\\Downloads\\doom1.wad")
+    val fileSize = file.length
+    val stream = new FileInputStream(file)
+    val buffer = stream.getChannel.map(READ_ONLY, 0, fileSize)
+    buffer.order(ByteOrder.LITTLE_ENDIAN)
+    buffer
+  }
 
   def extractBytesFromFile(): List[Byte] =
     Files.readAllBytes(Paths.get("C:\\Users\\neil\\Downloads\\doom1.wad")).toList
