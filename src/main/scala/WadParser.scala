@@ -31,7 +31,7 @@ case class Vertex(x: Int, y: Int) {
   override def toString: String = s"($x, $y)"
 }
 
-object WadParser extends App {
+object WadParser {
   val HEADER_SIZE = 12
 
   def createStreamFromFile(): MappedByteBuffer = {
@@ -66,9 +66,13 @@ object WadParser extends App {
     byteStream.get(nameBytes, 0, 8)
     val name = nameBytes.map(_.toChar).mkString.trim()
     val dataBytes = new Array[Byte](size)
-    data.position(filePos)
-    data.get(dataBytes, 0, size)
-    Lump(name, dataBytes.toList)
+    if (filePos >= 0) {
+      data.position(filePos)
+      data.get(dataBytes, 0, size)
+      Lump(name, dataBytes.toList)
+    } else {
+      Lump(name, List())
+    }
   }
 
   def extractLumps(byteStream: MappedByteBuffer, data: ByteBuffer): List[Lump] =
@@ -142,12 +146,6 @@ object WadParser extends App {
     val lumps = extractLumps(byteStream, data)
     val levels = extractLevels(None, lumps, "START").map(addLinesToLevel)
 
-    val wad = Wad(wadType, numLumps, levels)
-
-    println(wad)
-
-    wad
+    Wad(wadType, numLumps, levels)
   }
-
-  createWad()
 }
