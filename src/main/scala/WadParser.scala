@@ -1,9 +1,6 @@
 import java.io.{File, FileInputStream}
 import java.nio.{ByteBuffer, ByteOrder, MappedByteBuffer}
-import java.nio.file.{Files, Paths}
 import java.nio.channels.FileChannel.MapMode._
-
-import scala.annotation.tailrec
 
 case class Wad(wadType: String, numLumps: Int, levels: List[Level]) {
   override def toString: String = "[Wad] type: " + wadType + ", lumps: " + numLumps + ", levels: " + levels
