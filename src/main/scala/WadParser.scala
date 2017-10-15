@@ -3,6 +3,8 @@ import java.nio.{ByteBuffer, ByteOrder, MappedByteBuffer}
 import java.nio.file.{Files, Paths}
 import java.nio.channels.FileChannel.MapMode._
 
+import scala.annotation.tailrec
+
 case class Wad(wadType: String, numLumps: Int, levels: List[Level]) {
   override def toString: String = "[Wad] type: " + wadType + ", lumps: " + numLumps + ", levels: " + levels
 }
@@ -32,11 +34,12 @@ case class Vertex(x: Int, y: Int) {
   override def toString: String = s"($x, $y)"
 }
 
-object WadParser {
+object WadParser extends App {
   val HEADER_SIZE = 12
 
   def createStreamFromFile(): MappedByteBuffer = {
-    val file = new File("C:\\Users\\neil\\Downloads\\doom1.wad")
+    //val file = new File("C:\\Users\\neil\\Downloads\\doom1.wad")
+    val file = new File("/Users/neil/Downloads/doom1.wad")
     val fileSize = file.length
     val stream = new FileInputStream(file)
     val buffer = stream.getChannel.map(READ_ONLY, 0, fileSize)
@@ -44,30 +47,38 @@ object WadParser {
     buffer
   }
 
-  def extractBytesFromFile(): List[Byte] =
-    Files.readAllBytes(Paths.get("C:\\Users\\neil\\Downloads\\doom1.wad")).toList
-
-  def extractWadType(bytes: List[Byte]): String = bytes.take(4).map(_.toChar).mkString
-
-  def extractNumLumps(bytes: List[Byte]): Int =
-    ByteBuffer.wrap(bytes.slice(4, 8).toArray).order(ByteOrder.LITTLE_ENDIAN).getInt()
-
-  def extractData(bytes: List[Byte]): (Int, List[Byte]) = {
-    val dataLenBytes = bytes.slice(8, 12)
-    val dataLen = ByteBuffer.wrap(dataLenBytes.toArray).order(ByteOrder.LITTLE_ENDIAN).getInt() - HEADER_SIZE
-    val dataBytes = bytes.slice(12, dataLen)
-    (dataLen, dataBytes)
+  def extractWadType(byteStream: MappedByteBuffer): String = {
+    val wadTypeBytes = new Array[Byte](4)
+    byteStream.get(wadTypeBytes, 0, 4)
+    wadTypeBytes.map(_.toChar).mkString
   }
 
-  def extractLump(lumpBytes: List[Byte], data: List[Byte]): Lump = {
-    val filePos = ByteBuffer.wrap(lumpBytes.take(4).toArray).order(ByteOrder.LITTLE_ENDIAN).getInt() - HEADER_SIZE
-    val size = ByteBuffer.wrap(lumpBytes.slice(4, 8).toArray).order(ByteOrder.LITTLE_ENDIAN).getInt()
-    val name = lumpBytes.drop(8).map(_.toChar).mkString.trim()
-    Lump(name, data.slice(filePos, filePos + size))
+  def extractNumLumps(byteStream: MappedByteBuffer): Int = byteStream.getInt()
+
+  def extractData(byteStream: MappedByteBuffer): ByteBuffer = {
+    val dataEnd = byteStream.getInt()
+    val dataBytes = byteStream.slice()
+    byteStream.position(dataEnd)
+    dataBytes
   }
 
-  def extractLumps(bytes: List[Byte], dataLen: Int, data: List[Byte]): List[Lump] =
-    bytes.drop(dataLen + HEADER_SIZE).sliding(16, 16).map(extractLump(_, data)).toList
+  def extractLump(byteStream: MappedByteBuffer, data: ByteBuffer): Lump = {
+    val filePos = byteStream.getInt() - HEADER_SIZE
+    val size = byteStream.getInt()
+    val nameBytes = new Array[Byte](8)
+    byteStream.get(nameBytes, 0, 8)
+    val name = nameBytes.map(_.toChar).mkString.trim()
+    val dataBytes = new Array[Byte](size)
+    data.position(filePos)
+    data.get(dataBytes, 0, size)
+    Lump(name, dataBytes.toList)
+  }
+
+  def extractLumps(byteStream: MappedByteBuffer, data: ByteBuffer): List[Lump] =
+    byteStream.remaining() match {
+      case 0 => List()
+      case _ => extractLump(byteStream, data) +: extractLumps(byteStream, data)
+    }
 
   private def levelNameMatched(currentLevel: Option[Level], levelName: String, name: String,
                                remainingLumps: List[Lump]): List[Level] = {
@@ -127,13 +138,19 @@ object WadParser {
   }
 
   def createWad(): Wad = {
-    val bytes = extractBytesFromFile()
-    val wadType = extractWadType(bytes)
-    val numLumps = extractNumLumps(bytes)
-    val (dataLen, data) = extractData(bytes)
-    val lumps = extractLumps(bytes, dataLen, data)
+    val byteStream = createStreamFromFile()
+    val wadType = extractWadType(byteStream)
+    val numLumps = extractNumLumps(byteStream)
+    val data = extractData(byteStream)
+    val lumps = extractLumps(byteStream, data)
     val levels = extractLevels(None, lumps, "START").map(addLinesToLevel)
 
-    Wad(wadType, numLumps, levels)
+    val wad = Wad(wadType, numLumps, levels)
+
+    println(wad)
+
+    wad
   }
+
+  createWad()
 }
