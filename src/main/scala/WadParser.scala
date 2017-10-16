@@ -6,7 +6,8 @@ case class Wad(wadType: String, numLumps: Int, levels: List[Level]) {
   override def toString: String = "[Wad] type: " + wadType + ", lumps: " + numLumps + ", levels: " + levels
 }
 
-case class Level(name: String, lumps: Map[String, Lump], lines: Option[List[WadLine]]=None){
+case class Level(name: String, lumps: Map[String, Lump], lines: Option[List[WadLine]] = None,
+                 var quadTree: Option[LineMXQuadTree] = None){
   def addLump(lump: Lump): Level = {
     val newLumps: Map[String, Lump] = lumps + (lump.name -> lump)
     Level(name, newLumps)
@@ -145,6 +146,7 @@ object WadParser {
     val data = extractData(byteStream)
     val lumps = extractLumps(byteStream, data)
     val levels = extractLevels(None, lumps, "START").map(addLinesToLevel)
+    levels foreach {level => level.quadTree = Some(LineMXQuadTree.createQuadTree(level))}
 
     Wad(wadType, numLumps, levels)
   }
