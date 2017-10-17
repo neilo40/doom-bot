@@ -1,4 +1,4 @@
-class LineMXQuadTree(bounds: WadLine,
+class LineMXQuadTree(cellBounds: WadLine,
                      parent: Option[LineMXQuadTree] = None,
                      depth: Int = 0){
   var content: List[WadLine] = List()
@@ -10,26 +10,26 @@ class LineMXQuadTree(bounds: WadLine,
   //Doom origin is SW
   if (depth < LineMXQuadTree.MAX_DEPTH){
     nw = Some(new LineMXQuadTree(
-      WadLine(Vertex(bounds.a.x, (bounds.a.y + bounds.b.y) / 2), Vertex((bounds.a.x + bounds.b.x) / 2, bounds.b.y), oneSided = false),
+      WadLine(Vertex(cellBounds.a.x, (cellBounds.a.y + cellBounds.b.y) / 2), Vertex((cellBounds.a.x + cellBounds.b.x) / 2, cellBounds.b.y), oneSided = false),
       Some(this),
       depth + 1))
     ne = Some(new LineMXQuadTree(
-      WadLine(Vertex((bounds.a.x + bounds.b.x) / 2, (bounds.a.y + bounds.b.y) / 2), bounds.b, oneSided = false),
+      WadLine(Vertex((cellBounds.a.x + cellBounds.b.x) / 2, (cellBounds.a.y + cellBounds.b.y) / 2), cellBounds.b, oneSided = false),
       Some(this),
       depth + 1))
     se = Some(new LineMXQuadTree(
-      WadLine(Vertex((bounds.a.x + bounds.b.x) / 2, bounds.a.y), Vertex(bounds.b.x, (bounds.a.y + bounds.b.y) / 2), oneSided = false),
+      WadLine(Vertex((cellBounds.a.x + cellBounds.b.x) / 2, cellBounds.a.y), Vertex(cellBounds.b.x, (cellBounds.a.y + cellBounds.b.y) / 2), oneSided = false),
       Some(this),
       depth + 1))
     sw = Some(new LineMXQuadTree(
-      WadLine(bounds.a, Vertex((bounds.a.x + bounds.b.x) / 2, (bounds.a.y + bounds.b.y) / 2), oneSided = false),
+      WadLine(cellBounds.a, Vertex((cellBounds.a.x + cellBounds.b.x) / 2, (cellBounds.a.y + cellBounds.b.y) / 2), oneSided = false),
       Some(this),
       depth + 1))
   }
 
   def getAllBounds: List[WadLine] = {
     depth match {
-      case LineMXQuadTree.MAX_DEPTH => List(bounds)
+      case LineMXQuadTree.MAX_DEPTH => List(cellBounds)
       case _ => nw.get.getAllBounds ++ ne.get.getAllBounds ++ se.get.getAllBounds ++ sw.get.getAllBounds
     }
   }
@@ -37,8 +37,8 @@ class LineMXQuadTree(bounds: WadLine,
   def isLineWithinBounds(line: WadLine): Boolean = isPointWithinBounds(line.a) || isPointWithinBounds(line.b)
 
   def isPointWithinBounds(point: Vertex): Boolean = {
-    val pointIsGreaterThanBoundsStart = point.x >= bounds.a.x && point.y >= bounds.a.y
-    val pointIsSmallerThanBoundsEnd = point.x <= bounds.b.x && point.y <= bounds.b.y
+    val pointIsGreaterThanBoundsStart = point.x >= cellBounds.a.x && point.y >= cellBounds.a.y
+    val pointIsSmallerThanBoundsEnd = point.x <= cellBounds.b.x && point.y <= cellBounds.b.y
     pointIsGreaterThanBoundsStart && pointIsSmallerThanBoundsEnd
   }
 
@@ -61,6 +61,12 @@ class LineMXQuadTree(bounds: WadLine,
         if (quad.get.isPointWithinBounds(point)) quad.get.getLinesForPoint(point)
         else List()
       )
+  }
+
+  def getLinesBetweenTwoPoints(start: Vertex, end: Vertex): List[WadLine] = {
+    val linesForStartPoint = getLinesForPoint(start).toSet
+    val allLines = linesForStartPoint.union(getLinesForPoint(end).toSet)
+    allLines.toList
   }
 }
 

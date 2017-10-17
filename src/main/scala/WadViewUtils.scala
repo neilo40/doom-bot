@@ -1,6 +1,6 @@
-import scalafx.scene.paint.Color.{Green, LightGrey, Red, Transparent, Black}
-import scalafx.scene.shape.{Line, Rectangle}
-import javafx.scene.shape.{Line => JavaFxLine, Rectangle => JavaFxRectangle}
+import scalafx.scene.paint.Color.{Black, Green, LightGrey, Red, Transparent}
+import scalafx.scene.shape.{Circle, Line, Rectangle}
+import javafx.scene.shape.{Line => JavaFxLine, Rectangle => JavaFxRectangle, Circle => JavaFxCircle}
 
 import scalafx.collections.ObservableBuffer
 import scalafx.scene.Node
@@ -50,6 +50,7 @@ object WadViewUtils {
       val wadPoint = screenPointToWadPoint(x, y)
       val lines = level.quadTree.get.getLinesForPoint(wadPoint)
       if (lines.nonEmpty) {
+        println(lines)
         showLevel(level)
         showQuadTree(level)
         val screenLines = makeLinesForDisplay(lines, Red)
@@ -60,6 +61,23 @@ object WadViewUtils {
     }
   }
 
+  def generatePath(): Unit = {
+    val level = levels.find(_.name == DoomViewer.mapComboBox.value.value).get
+    val pathNodes = PathFinder.genPathForLevel(level)
+  }
+
+  def drawPath(line: WadLine): Unit = {
+    val pathLine = makeLinesForDisplay(List(line), otherColour = Green).head
+    DoomViewer.mapPane.children.add(pathLine)
+  }
+
+  def drawNode(location: Vertex): Unit = {
+    val screenLocation = wadPointToScreenPoint(location)
+    val circle = new Circle(new JavaFxCircle(screenLocation.x, screenLocation.y, 3))
+    circle.fill = Red
+    DoomViewer.mapPane.children.add(circle)
+  }
+
   // Private methods
 
   private def showQuadTree(level: Level): Unit = {
@@ -67,6 +85,14 @@ object WadViewUtils {
     val lines = fitLinesToScreen(quadTree.getAllBounds)
     val boxes = lines.map(lineToRect(_, Green))
     boxes.foreach{DoomViewer.mapPane.children.add(_)}
+  }
+
+  // TODO: use this in line conversion code
+  private def wadPointToScreenPoint(point: Vertex): Vertex = {
+    val (levelBounds, scalingFactor) = getLevelBounds
+    val shiftedPoint = Vertex(point.x - levelBounds.a.x, point.y - levelBounds.a.y)
+    val flippedPoint = Vertex(shiftedPoint.x, (levelBounds.b.y - levelBounds.a.y) - shiftedPoint.y)
+    Vertex((flippedPoint.x / scalingFactor).toInt, (flippedPoint.y / scalingFactor).toInt)
   }
 
   private def screenPointToWadPoint(x: Double, y: Double): Vertex = {
@@ -139,13 +165,13 @@ object WadViewUtils {
 
   //TODO: support portrait orientation levels
   private def fitLinesToScreen(lines: List[WadLine]): List[WadLine] = {
-    val (levelBounds, scalingFactor) = getLevelBounds()
+    val (levelBounds, scalingFactor) = getLevelBounds
     lines.map(shiftLine(_, levelBounds.a.x, levelBounds.a.y))
       .map(flipYAxis(_, levelBounds.b.y - levelBounds.a.y))
       .map(scaleLine(_, scalingFactor))
   }
 
-  private def getLevelBounds(): (WadLine, Double) = {
+  private def getLevelBounds: (WadLine, Double) = {
     val level = levels.find(_.name == DoomViewer.mapComboBox.value.value).get
     val (minX, minY) = getMinCoords(level.lines.get)
     val (maxX, maxY) = getMaxCoords(level.lines.get)
@@ -153,7 +179,8 @@ object WadViewUtils {
     (WadLine(Vertex(minX, minY), Vertex(maxX, maxY), oneSided = false), factor)
   }
 
-  private def makeLinesForDisplay(wadLines: List[WadLine], colour: Color = Black): List[Line] = {
+  private def makeLinesForDisplay(wadLines: List[WadLine], colour: Color = Black,
+                                  otherColour: Color = LightGrey): List[Line] = {
     val fittedLines = fitLinesToScreen(wadLines)
     fittedLines.map(line => {
       val l = new Line(new JavaFxLine(line.a.x, line.a.y, line.b.x, line.b.y))
@@ -161,7 +188,7 @@ object WadViewUtils {
         l.strokeWidth = 2
         l.stroke = colour
       } else {
-        l.stroke = LightGrey
+        l.stroke = otherColour
       }
       l
     })

@@ -33,8 +33,13 @@ object DoomViewer extends JFXApp{
   }
 
   val loadWadButton = new Button {
-    text = "Load Wad"
+    text = "Reload Wad"
     onMouseClicked = (e: MouseEvent) => WadViewUtils.loadWad()
+  }
+
+  val generatePathButton = new Button {
+    text = "Generate Path"
+    onMouseClicked = (e: MouseEvent) => WadViewUtils.generatePath()
   }
 
   stage = new application.JFXApp.PrimaryStage {
@@ -47,11 +52,14 @@ object DoomViewer extends JFXApp{
         children = Seq(
           new VBox{
             prefWidth = WadViewUtils.BUTTON_BAR_WIDTH
-            children = Seq(loadWadButton, mapComboBox, boundingBoxesButton, showQuadTreeButton)
+            children = Seq(loadWadButton, mapComboBox, boundingBoxesButton, showQuadTreeButton, generatePathButton)
           },
           mapPane
         )
       }
     }
   }
+
+  stage.show()
+  WadViewUtils.loadWad()
 }
