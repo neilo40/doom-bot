@@ -53,7 +53,6 @@ object WadViewUtils {
       val wadPoint = screenPointToWadPoint(x, y)
       val lines = level.quadTree.get.getLinesForPoint(wadPoint)
       if (lines.nonEmpty) {
-        println(lines)
         showLevel(level)
         showQuadTree(level)
         val screenLines = makeLinesForDisplay(lines, Red)

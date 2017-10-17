@@ -34,7 +34,31 @@ class LineMXQuadTree(cellBounds: WadLine,
     }
   }
 
-  def isLineWithinBounds(line: WadLine): Boolean = isPointWithinBounds(line.a) || isPointWithinBounds(line.b)
+  def isLineWithinBounds(line: WadLine): Boolean = {
+    isPointWithinBounds(line.a) || isPointWithinBounds(line.b) ||
+    isPointWithinBounds(Vertex(line.a.x, line.b.y)) || isPointWithinBounds(Vertex(line.b.x, line.a.y)) ||
+    lineSpansBounds(line)
+  }
+
+  def lineSpansBounds(line: WadLine): Boolean = {
+    lineSpansBoundsVertically(line) || lineSpansBoundsHorizontally(line)
+  }
+
+  def lineSpansBoundsVertically(line: WadLine): Boolean = {
+    //Fudge to catch lines that don't start or end inside, but span vertically or horizontally
+    line.a.x > cellBounds.a.x && line.a.x < cellBounds.b.x &&
+    line.b.x > cellBounds.a.x && line.b.x < cellBounds.b.x &&
+    ((line.a.y > cellBounds.b.y && line.b.y < cellBounds.a.y) ||
+     (line.b.y > cellBounds.b.y && line.a.y < cellBounds.a.y))
+  }
+
+  def lineSpansBoundsHorizontally(line: WadLine): Boolean = {
+    //Fudge to catch lines that don't start or end inside, but span vertically or horizontally
+    line.a.y > cellBounds.a.y && line.a.y < cellBounds.b.y &&
+      line.b.y > cellBounds.a.y && line.b.y < cellBounds.b.y &&
+      ((line.a.x > cellBounds.b.x && line.b.x < cellBounds.a.x) ||
+        (line.b.x > cellBounds.b.x && line.a.x < cellBounds.a.x))
+  }
 
   def isPointWithinBounds(point: Vertex): Boolean = {
     val pointIsGreaterThanBoundsStart = point.x >= cellBounds.a.x && point.y >= cellBounds.a.y
@@ -76,7 +100,7 @@ object LineMXQuadTree {
   def createQuadTree(level: Level): LineMXQuadTree = {
     val (maxX, maxY) = WadViewUtils.getMaxCoords(level.lines.get)
     val (minX, minY) = WadViewUtils.getMinCoords(level.lines.get)
-    val levelBounds = WadLine(Vertex(minX, minY), Vertex(maxX, maxY), oneSided = false)
+    val levelBounds = WadLine(Vertex(minX - 1, minY - 1), Vertex(maxX + 1, maxY + 1), oneSided = false)
     val quadTree = new LineMXQuadTree(levelBounds)
     val outsideLines = allExternalLines(level)
     outsideLines foreach quadTree.assignLineToNode
