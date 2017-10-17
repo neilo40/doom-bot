@@ -1,3 +1,5 @@
+import scalafx.scene.paint.Color.Blue
+
 trait PathNodeTrait
 
 class PathNode(location: Vertex,
@@ -14,14 +16,12 @@ class PathNode(location: Vertex,
       case _ => false
     }
 
-  //TODO: need to check if we are creating a node that already exists - use it instead.
   def branchOut(seenNodes: List[PathNode]): List[PathNode] = {
     edges = edges map {
       case (direction, None) => (direction, Some(addNewNode(location, direction, this, seenNodes)))
       case (direction, Some(x)) => (direction, Some(x))
     }
     val pathNodes = extractPathNodes(edges.values.toList.map(_.get))
-    //val newNodesOnly = pathNodes.filter{node => !seenNodes.contains(node)}
     pathNodes
   }
 
@@ -39,7 +39,6 @@ class PathNode(location: Vertex,
     potentialObstructions foreach {wall =>
       if (proposedLine.intersectsWith(wall)) return new DeadEnd()
     }
-    //TODO: make view refresh immediately?
     WadViewUtils.drawPath(proposedLine)
     WadViewUtils.drawNode(proposedLocation)
     newNode
@@ -58,15 +57,16 @@ class DeadEnd extends PathNodeTrait
 
 object PathFinder {
 
-  val STEP_SIZE = 50
+  val STEP_SIZE = 80
+  val MAX_ITERATIONS = 80
 
   def genPathForLevel(level: Level): PathNode = {
-    val startingPos = new PathNode(Vertex(1052, -3640), level) // TODO: get this from the level data.  This is for E1M1
-    WadViewUtils.drawNode(startingPos.getLocation)
+    val startingPos = new PathNode(level.playerStart.get, level)
+    WadViewUtils.drawNode(startingPos.getLocation, Blue)
     var newNodes: List[PathNode] = List(startingPos)
     var seenNodes: List[PathNode] = List()
     var iterationCount = 0
-    while (iterationCount < 80) {
+    while (iterationCount < MAX_ITERATIONS) {
       newNodes = branchOutNewNodes(newNodes, seenNodes)
       seenNodes = seenNodes ++ newNodes
       iterationCount = iterationCount + 1

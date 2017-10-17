@@ -1,3 +1,4 @@
+import scala.concurrent.Future
 import scalafx.application
 import scalafx.application.JFXApp
 import scalafx.scene.Scene
@@ -7,6 +8,7 @@ import scalafx.scene.input.MouseEvent
 import scalafx.scene.layout.{HBox, Pane, VBox}
 import scalafx.Includes._
 import scalafx.event.ActionEvent
+import scala.concurrent.ExecutionContext.Implicits.global
 
 object DoomViewer extends JFXApp{
 
@@ -34,12 +36,12 @@ object DoomViewer extends JFXApp{
 
   val loadWadButton = new Button {
     text = "Reload Wad"
-    onMouseClicked = (e: MouseEvent) => WadViewUtils.loadWad()
+    onMouseClicked = (e: MouseEvent) => Future {WadViewUtils.loadWad()}
   }
 
   val generatePathButton = new Button {
     text = "Generate Path"
-    onMouseClicked = (e: MouseEvent) => WadViewUtils.generatePath()
+    onMouseClicked = (e: MouseEvent) => Future {WadViewUtils.generatePath()}
   }
 
   stage = new application.JFXApp.PrimaryStage {

@@ -7,7 +7,7 @@ case class Wad(wadType: String, numLumps: Int, levels: List[Level]) {
 }
 
 case class Level(name: String, lumps: Map[String, Lump], lines: Option[List[WadLine]] = None,
-                 var quadTree: Option[LineMXQuadTree] = None){
+                 var quadTree: Option[LineMXQuadTree] = None, var playerStart: Option[Vertex] = None){
   def addLump(lump: Lump): Level = {
     val newLumps: Map[String, Lump] = lumps + (lump.name -> lump)
     Level(name, newLumps)
@@ -16,6 +16,8 @@ case class Level(name: String, lumps: Map[String, Lump], lines: Option[List[WadL
   def setLines(lines: List[WadLine]): Level = {
     Level(this.name, this.lumps, Some(lines))
   }
+
+  def setPlayerStart(v: Vertex): Unit = this.playerStart = Some(v)
 
   override def toString: String = "[Level] name: " + name
 }
@@ -44,6 +46,9 @@ case class Vertex(x: Int, y: Int) {
     Vertex(x + that.x, y + that.y)
   }
 }
+
+case class Thing(position: Vertex, facing: Int, doomId: Int)
+
 
 object WadParser {
   val HEADER_SIZE = 12
@@ -148,8 +153,23 @@ object WadParser {
     linedefs.sliding(14, 14).map(extractLine(_, vertices)).toList
   }
 
-  def addLinesToLevel(level: Level): Level = {
-    level.setLines(extractLinesForLevel(level))
+  def addMiscDataToLevel(level: Level): Level = {
+    val levelWithLines = level.setLines(extractLinesForLevel(level))
+    levelWithLines.setPlayerStart(extractPlayerStart(level))
+    levelWithLines
+  }
+
+  def extractThing(bytes: List[Byte]): Thing = {
+    val position = extractVertex(bytes.take(4))
+    val angle = ByteBuffer.wrap(bytes.slice(4, 6).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
+    val doomId = ByteBuffer.wrap(bytes.slice(6, 8).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
+    Thing(position, angle, doomId)
+  }
+
+  def extractPlayerStart(level: Level): Vertex = {
+    val thingsLump = level.lumps("THINGS").data
+    val things = (thingsLump.sliding(10, 10) map extractThing).toList
+    things.find(_.doomId == 1).get.position
   }
 
   def createWad(): Wad = {
@@ -158,7 +178,7 @@ object WadParser {
     val numLumps = extractNumLumps(byteStream)
     val data = extractData(byteStream)
     val lumps = extractLumps(byteStream, data)
-    val levels = extractLevels(None, lumps, "START").map(addLinesToLevel)
+    val levels = extractLevels(None, lumps, "START").map(addMiscDataToLevel)
     levels foreach {level => level.quadTree = Some(LineMXQuadTree.createQuadTree(level))}
 
     Wad(wadType, numLumps, levels)

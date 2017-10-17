@@ -1,7 +1,8 @@
 import scalafx.scene.paint.Color.{Black, Green, LightGrey, Red, Transparent}
 import scalafx.scene.shape.{Circle, Line, Rectangle}
-import javafx.scene.shape.{Line => JavaFxLine, Rectangle => JavaFxRectangle, Circle => JavaFxCircle}
+import javafx.scene.shape.{Circle => JavaFxCircle, Line => JavaFxLine, Rectangle => JavaFxRectangle}
 
+import scalafx.application.Platform
 import scalafx.collections.ObservableBuffer
 import scalafx.scene.Node
 import scalafx.scene.paint.Color
@@ -18,8 +19,10 @@ object WadViewUtils {
     val wad = WadParser.createWad()
     levels = wad.levels
     val levelNames = levels.map(_.name)
-    DoomViewer.mapComboBox.items = ObservableBuffer(levelNames)
-    DoomViewer.mapComboBox.value = levels.head.name // default to the first map
+    Platform.runLater {
+      DoomViewer.mapComboBox.items = ObservableBuffer(levelNames)
+      DoomViewer.mapComboBox.value = levels.head.name // default to the first map
+    }
   }
 
   def changeLevel(name: String): Unit = {
@@ -68,14 +71,18 @@ object WadViewUtils {
 
   def drawPath(line: WadLine): Unit = {
     val pathLine = makeLinesForDisplay(List(line), otherColour = Green).head
-    DoomViewer.mapPane.children.add(pathLine)
+    Platform.runLater {
+      DoomViewer.mapPane.children.add(pathLine)
+    }
   }
 
-  def drawNode(location: Vertex): Unit = {
+  def drawNode(location: Vertex, colour: scalafx.scene.paint.Color = Red): Unit = {
     val screenLocation = wadPointToScreenPoint(location)
-    val circle = new Circle(new JavaFxCircle(screenLocation.x, screenLocation.y, 3))
-    circle.fill = Red
-    DoomViewer.mapPane.children.add(circle)
+    Platform.runLater {
+      val circle = new Circle(new JavaFxCircle(screenLocation.x, screenLocation.y, 3))
+      circle.fill = colour
+      DoomViewer.mapPane.children.add(circle)
+    }
   }
 
   // Private methods
