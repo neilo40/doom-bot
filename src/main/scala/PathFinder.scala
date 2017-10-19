@@ -57,8 +57,8 @@ class DeadEnd extends PathNodeTrait
 
 object PathFinder {
 
-  val STEP_SIZE = 80
-  val MAX_ITERATIONS = 80
+  val STEP_SIZE = 70
+  val MAX_ITERATIONS = 180
 
   def genPathForLevel(level: Level): PathNode = {
     val startingPos = new PathNode(level.playerStart.get, level)
@@ -66,7 +66,7 @@ object PathFinder {
     var newNodes: List[PathNode] = List(startingPos)
     var seenNodes: List[PathNode] = List()
     var iterationCount = 0
-    while (iterationCount < MAX_ITERATIONS) {
+    while (iterationCount < MAX_ITERATIONS && newNodes.nonEmpty) {
       newNodes = branchOutNewNodes(newNodes, seenNodes)
       seenNodes = seenNodes ++ newNodes
       iterationCount = iterationCount + 1

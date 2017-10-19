@@ -7,15 +7,18 @@ case class Wad(wadType: String, numLumps: Int, levels: List[Level]) {
 }
 
 case class Level(name: String, lumps: Map[String, Lump], lines: Option[List[WadLine]] = None,
-                 var quadTree: Option[LineMXQuadTree] = None, var playerStart: Option[Vertex] = None){
+                 var quadTree: Option[LineMXQuadTree] = None, var playerStart: Option[Vertex] = None,
+                var sectors: Option[List[Sector]] = None){
   def addLump(lump: Lump): Level = {
     val newLumps: Map[String, Lump] = lumps + (lump.name -> lump)
-    Level(name, newLumps)
+    Level(this.name, newLumps, this.lines, this.quadTree, this.playerStart, this.sectors)
   }
 
-  def setLines(lines: List[WadLine]): Level = {
-    Level(this.name, this.lumps, Some(lines))
-  }
+  def setLines(lines: List[WadLine]): Level =
+    Level(this.name, this.lumps, Some(lines), this.quadTree, this.playerStart, this.sectors)
+
+  def setSectors(sectors: List[Sector]): Level =
+    Level(this.name, this.lumps, this.lines, this.quadTree, this.playerStart, Some(sectors))
 
   def setPlayerStart(v: Vertex): Unit = this.playerStart = Some(v)
 
@@ -26,7 +29,7 @@ case class Lump(name: String, data: List[Byte]) {
   override def toString: String = "[Lump] name: " + name
 }
 
-case class WadLine(a: Vertex, b: Vertex, oneSided: Boolean) {
+case class WadLine(a: Vertex, b: Vertex, oneSided: Boolean, sectorTag: Option[Int] = None) {
   override def toString: String = s"[Line] $a <-> $b, oneSided: $oneSided"
 
   def intersectsWith(that: WadLine): Boolean = {
@@ -48,6 +51,8 @@ case class Vertex(x: Int, y: Int) {
 }
 
 case class Thing(position: Vertex, facing: Int, doomId: Int)
+
+case class Sector(sectorType: Int, tag: Int)
 
 
 object WadParser {
@@ -142,9 +147,13 @@ object WadParser {
   private def extractLine(bytes: List[Byte], vertices: List[Vertex]): WadLine = {
     val aIndex = ByteBuffer.wrap(bytes.take(2).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
     val bIndex = ByteBuffer.wrap(bytes.slice(2, 4).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
+    val flags = ByteBuffer.wrap(bytes.slice(4, 6).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
+    val specialType = ByteBuffer.wrap(bytes.slice(6, 8).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
+    val sectorTag = ByteBuffer.wrap(bytes.slice(8, 10).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
     val leftSide = ByteBuffer.wrap(bytes.slice(10, 12).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
     val rightSide = ByteBuffer.wrap(bytes.slice(12, 14).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
-    WadLine(vertices(aIndex), vertices(bIndex), leftSide == -1 || rightSide == -1)
+    val oneSided = leftSide == -1 || rightSide == -1 || (flags & 0x0001) == 1
+    WadLine(vertices(aIndex), vertices(bIndex), oneSided, Some(sectorTag))
   }
 
   def extractLinesForLevel(level: Level): List[WadLine] = {
@@ -153,10 +162,22 @@ object WadParser {
     linedefs.sliding(14, 14).map(extractLine(_, vertices)).toList
   }
 
+  def extractSector(bytes: List[Byte]): Sector = {
+    val sectorType = ByteBuffer.wrap(bytes.slice(22, 24).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
+    val tag = ByteBuffer.wrap(bytes.slice(24, 26).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
+    Sector(sectorType, tag)
+  }
+
+  def extractSectorsForLevel(level: Level): List[Sector] = {
+    val sectorBytes = level.lumps("SECTORS").data
+    (sectorBytes.sliding(26, 26) map extractSector).toList
+  }
+
   def addMiscDataToLevel(level: Level): Level = {
     val levelWithLines = level.setLines(extractLinesForLevel(level))
     levelWithLines.setPlayerStart(extractPlayerStart(level))
-    levelWithLines
+    val levelWithSectors = levelWithLines.setSectors(extractSectorsForLevel(level))
+    levelWithSectors
   }
 
   def extractThing(bytes: List[Byte]): Thing = {
