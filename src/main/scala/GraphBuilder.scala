@@ -8,6 +8,21 @@ class PathNode(location: Vertex,
   extends PathNodeTrait {
 
   def getLocation: Vertex = location
+  def getLevel: Level = level
+
+  def north: Option[PathNode] = nodeAtDirection("n")
+  def south: Option[PathNode] = nodeAtDirection("s")
+  def east: Option[PathNode] = nodeAtDirection("e")
+  def west: Option[PathNode] = nodeAtDirection("w")
+
+  def neighbours: List[PathNode] = (edges.values collect { case Some(x: PathNode) => x }).toList
+
+  private def nodeAtDirection(direction: String): Option[PathNode] = {
+    edges(direction) match {
+      case Some(x: PathNode) => Some(x)
+      case _ => None
+    }
+  }
 
   // Consider the nodes to be equal if they're in the same place
   override def equals(that: scala.Any): Boolean =
@@ -32,8 +47,6 @@ class PathNode(location: Vertex,
     val proposedLocation = start + PathNode.translations(direction)
     val proposedNode = new PathNode(proposedLocation, level)
     val existingProposedNode = seenNodes.find(_ == proposedNode)
-    val newNode = if (existingProposedNode.isDefined) existingProposedNode.get else proposedNode
-    newNode.edges = newNode.edges + (PathNode.oppositeDirection(direction) -> Some(fromNode))
     val potentialObstructions = level.quadTree.get.getLinesBetweenTwoPoints(start, proposedLocation)
     val proposedLine = WadLine(start, proposedLocation, oneSided = false)
     potentialObstructions foreach {wall =>
@@ -41,21 +54,26 @@ class PathNode(location: Vertex,
     }
     WadViewUtils.drawPath(proposedLine)
     WadViewUtils.drawNode(proposedLocation)
+
+    val newNode = if (existingProposedNode.isDefined) existingProposedNode.get else proposedNode
+    newNode.edges = newNode.edges + (PathNode.oppositeDirection(direction) -> Some(fromNode))
     newNode
   }
+
+  override def toString: String = s"PathNode: $location"
 }
 
 object PathNode {
   val oppositeDirection = Map("n" -> "s", "e" -> "w", "s" -> "n", "w" -> "e")
-  val translations = Map("n" -> Vertex(0, PathFinder.STEP_SIZE),
-  "s" -> Vertex(0, -PathFinder.STEP_SIZE),
-  "e" -> Vertex(PathFinder.STEP_SIZE, 0),
-  "w" -> Vertex(-PathFinder.STEP_SIZE, 0))
+  val translations = Map("n" -> Vertex(0, GraphBuilder.STEP_SIZE),
+  "s" -> Vertex(0, -GraphBuilder.STEP_SIZE),
+  "e" -> Vertex(GraphBuilder.STEP_SIZE, 0),
+  "w" -> Vertex(-GraphBuilder.STEP_SIZE, 0))
 }
 
 class DeadEnd extends PathNodeTrait
 
-object PathFinder {
+object GraphBuilder {
 
   val STEP_SIZE = 70
   val MAX_ITERATIONS = 180

@@ -12,21 +12,21 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 object DoomViewer extends JFXApp{
 
-  val mapPane = new Pane{
+  val mapPane: Pane = new Pane{
     onMouseClicked = (e: MouseEvent) => WadViewUtils.paneClicked(e.x, e.y)
   }
 
-  val boundingBoxesButton = new ToggleButton{
+  val boundingBoxesButton: ToggleButton = new ToggleButton{
     text = "Show Bounds"
     onMouseClicked = (e: MouseEvent) => WadViewUtils.boundingBoxToggle(this.selected.value)
   }
 
-  val showQuadTreeButton = new ToggleButton{
+  val showQuadTreeButton: ToggleButton = new ToggleButton{
     text = "Show QuadTree"
     onMouseClicked = (e: MouseEvent) => WadViewUtils.quadTreeToggle(this.selected.value)
   }
 
-  val mapComboBox = new ComboBox[String]{
+  val mapComboBox: ComboBox[String] = new ComboBox[String]{
     onAction = (e: ActionEvent) => {
       boundingBoxesButton.selected = false
       showQuadTreeButton.selected = false
@@ -34,14 +34,24 @@ object DoomViewer extends JFXApp{
     }
   }
 
-  val loadWadButton = new Button {
+  val loadWadButton: Button = new Button {
     text = "Reload Wad"
     onMouseClicked = (e: MouseEvent) => Future {WadViewUtils.loadWad()}
   }
 
-  val generatePathButton = new Button {
-    text = "Generate Path"
+  val generateGridButton: Button = new Button {
+    text = "Generate Grid"
     onMouseClicked = (e: MouseEvent) => Future {WadViewUtils.generatePath()}
+  }
+
+  val findPathButton: Button = new Button {
+    text = "Find Path"
+    onMouseClicked = (e: MouseEvent) => Future {AStar.findPathCallback()}
+  }
+
+  val clearButton: Button = new Button {
+    text = "Clear"
+    onMouseClicked = (e: MouseEvent) => Future{WadViewUtils.clearScreen()}
   }
 
   stage = new application.JFXApp.PrimaryStage {
@@ -54,7 +64,8 @@ object DoomViewer extends JFXApp{
         children = Seq(
           new VBox{
             prefWidth = WadViewUtils.BUTTON_BAR_WIDTH
-            children = Seq(loadWadButton, mapComboBox, boundingBoxesButton, showQuadTreeButton, generatePathButton)
+            children = Seq(loadWadButton, mapComboBox, boundingBoxesButton, showQuadTreeButton, generateGridButton,
+              findPathButton, clearButton)
           },
           mapPane
         )

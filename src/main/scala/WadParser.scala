@@ -60,7 +60,7 @@ object WadParser {
 
   def createStreamFromFile(): MappedByteBuffer = {
     //val file = new File("C:\\Users\\neil\\Downloads\\doom1.wad")
-    val file = new File("/Users/neil/Downloads/doom1.wad")
+    val file = new File("/home/neil/Downloads/doom1.wad")
     val fileSize = file.length
     val stream = new FileInputStream(file)
     val buffer = stream.getChannel.map(READ_ONLY, 0, fileSize)

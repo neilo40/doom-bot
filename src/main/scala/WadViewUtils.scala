@@ -65,7 +65,7 @@ object WadViewUtils {
 
   def generatePath(): Unit = {
     val level = levels.find(_.name == DoomViewer.mapComboBox.value.value).get
-    val pathNodes = PathFinder.genPathForLevel(level)
+    val pathNodes = GraphBuilder.genPathForLevel(level)
   }
 
   def drawPath(line: WadLine): Unit = {
@@ -81,6 +81,13 @@ object WadViewUtils {
       val circle = new Circle(new JavaFxCircle(screenLocation.x, screenLocation.y, 3))
       circle.fill = colour
       DoomViewer.mapPane.children.add(circle)
+    }
+  }
+
+  def clearScreen(): Unit = {
+    val level = levels.find(_.name == DoomViewer.mapComboBox.value.value).get
+    Platform.runLater {
+      showLevel(level)
     }
   }
 
