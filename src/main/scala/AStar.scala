@@ -6,7 +6,7 @@ object AStar {
 
   def getStartingNode: PathNode = {
     def wad = WadParser.createWad()
-    GraphBuilder.genPathForLevel(wad.levels.head)
+    GraphBuilder.genGraphForLevel(wad.levels.head)
   }
 
   // Simple straight line from node to target
@@ -18,7 +18,7 @@ object AStar {
 
   // 1st attempt, taken straight from wikipedia!
   // TODO: make an immutable, functional version
-  def calculatePath(startingNode: PathNode, targetNode: PathNode): Unit = {
+  def calculatePath(startingNode: PathNode, targetNode: PathNode, drawPathOnly: Boolean = false): Option[PathNode] = {
     val closedSet = mutable.Set[PathNode]()
     val openSet = mutable.Set(startingNode)
     val cameFrom = mutable.Map[PathNode, PathNode]()
@@ -28,20 +28,20 @@ object AStar {
 
     while (openSet.nonEmpty){
       val currentNode: PathNode = openSet minBy fScore
-      if (currentNode == targetNode){
+      if (currentNode.isCloseEnough(targetNode)) {
         reconstructPath(cameFrom, currentNode)
-        return
+        return Some(currentNode)
       }
 
       openSet.remove(currentNode)
       closedSet.add(currentNode)
-      WadViewUtils.drawNode(currentNode.getLocation, Black)
+      if (!drawPathOnly) WadViewUtils.drawNode(currentNode.getLocation, Black)
 
       currentNode.neighbours.foreach { neighbour =>
         if (!closedSet.contains(neighbour)){
           if (!openSet.contains(neighbour)) {
             openSet.add(neighbour)
-            WadViewUtils.drawNode(neighbour.getLocation, White)
+            if (!drawPathOnly) WadViewUtils.drawNode(neighbour.getLocation, White)
           }
           val tentativeGScore = gScore(currentNode) + heuristicCostEstimate(currentNode, neighbour)
           if (tentativeGScore < gScore(neighbour)){
@@ -52,6 +52,7 @@ object AStar {
         }
       }
     }
+    None
   }
 
   def reconstructPath(cameFrom: mutable.Map[PathNode, PathNode], endNode: PathNode): Unit = {
@@ -63,8 +64,13 @@ object AStar {
     WadViewUtils.drawNode(currentNode.getLocation, Yellow)
   }
 
+  def closestNodeTo(startingNode: PathNode, target: Vertex): Option[PathNode] = {
+    calculatePath(startingNode, new PathNode(target, startingNode.getLevel), drawPathOnly = true)
+  }
+
   def findPathCallback(): Unit = {
     val startingNode = getStartingNode
+    //TODO: make this selectable on the UI
     val targetNode = new PathNode(Vertex(1476, -3616), startingNode.getLevel)
     //val targetNode = getStartingNode.north.get.north.get.east.get.north.get
     WadViewUtils.drawNode(targetNode.getLocation, Blue)

@@ -42,7 +42,7 @@ case class WadLine(a: Vertex, b: Vertex, oneSided: Boolean, sectorTag: Option[In
   }
 }
 
-case class Vertex(x: Int, y: Int) {
+case class Vertex(x: Double, y: Double) {
   override def toString: String = s"($x, $y)"
 
   def +(that: Vertex): Vertex = {
@@ -58,9 +58,8 @@ case class Sector(sectorType: Int, tag: Int)
 object WadParser {
   val HEADER_SIZE = 12
 
-  def createStreamFromFile(): MappedByteBuffer = {
-    //val file = new File("C:\\Users\\neil\\Downloads\\doom1.wad")
-    val file = new File("/home/neil/Downloads/doom1.wad")
+  private def createStream(fromFile: String): MappedByteBuffer = {
+    val file = new File(fromFile)
     val fileSize = file.length
     val stream = new FileInputStream(file)
     val buffer = stream.getChannel.map(READ_ONLY, 0, fileSize)
@@ -68,22 +67,22 @@ object WadParser {
     buffer
   }
 
-  def extractWadType(byteStream: MappedByteBuffer): String = {
+  private def extractWadType(byteStream: MappedByteBuffer): String = {
     val wadTypeBytes = new Array[Byte](4)
     byteStream.get(wadTypeBytes, 0, 4)
     wadTypeBytes.map(_.toChar).mkString
   }
 
-  def extractNumLumps(byteStream: MappedByteBuffer): Int = byteStream.getInt()
+  private def extractNumLumps(byteStream: MappedByteBuffer): Int = byteStream.getInt()
 
-  def extractData(byteStream: MappedByteBuffer): ByteBuffer = {
+  private def extractData(byteStream: MappedByteBuffer): ByteBuffer = {
     val dataEnd = byteStream.getInt()
     val dataBytes = byteStream.slice()
     byteStream.position(dataEnd)
     dataBytes
   }
 
-  def extractLump(byteStream: MappedByteBuffer, data: ByteBuffer): Lump = {
+  private def extractLump(byteStream: MappedByteBuffer, data: ByteBuffer): Lump = {
     val filePos = byteStream.getInt() - HEADER_SIZE
     val size = byteStream.getInt()
     val nameBytes = new Array[Byte](8)
@@ -99,7 +98,7 @@ object WadParser {
     }
   }
 
-  def extractLumps(byteStream: MappedByteBuffer, data: ByteBuffer): List[Lump] =
+  private def extractLumps(byteStream: MappedByteBuffer, data: ByteBuffer): List[Lump] =
     byteStream.remaining() match {
       case 0 => List()
       case _ => extractLump(byteStream, data) +: extractLumps(byteStream, data)
@@ -123,7 +122,7 @@ object WadParser {
     }
   }
 
-  def extractLevels(currentLevel: Option[Level], remainingLumps: List[Lump], name: String): List[Level] = {
+  private def extractLevels(currentLevel: Option[Level], remainingLumps: List[Lump], name: String): List[Level] = {
     val currentLump = remainingLumps.headOption.getOrElse(Lump("FINISH", List()))
     val pattern = "(E[0-9]M[0-9])".r
     currentLump.name match {
@@ -139,7 +138,7 @@ object WadParser {
     Vertex(x, y)
   }
 
-  def extractVerticesForLevel(level: Level): List[Vertex] = {
+  private def extractVerticesForLevel(level: Level): List[Vertex] = {
     val vertexData = level.lumps("VERTEXES").data
     vertexData.sliding(4, 4).map(extractVertex).toList
   }
@@ -156,45 +155,45 @@ object WadParser {
     WadLine(vertices(aIndex), vertices(bIndex), oneSided, Some(sectorTag))
   }
 
-  def extractLinesForLevel(level: Level): List[WadLine] = {
+  private def extractLinesForLevel(level: Level): List[WadLine] = {
     val vertices = extractVerticesForLevel(level)
     val linedefs = level.lumps("LINEDEFS").data
     linedefs.sliding(14, 14).map(extractLine(_, vertices)).toList
   }
 
-  def extractSector(bytes: List[Byte]): Sector = {
+  private def extractSector(bytes: List[Byte]): Sector = {
     val sectorType = ByteBuffer.wrap(bytes.slice(22, 24).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
     val tag = ByteBuffer.wrap(bytes.slice(24, 26).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
     Sector(sectorType, tag)
   }
 
-  def extractSectorsForLevel(level: Level): List[Sector] = {
+  private def extractSectorsForLevel(level: Level): List[Sector] = {
     val sectorBytes = level.lumps("SECTORS").data
     (sectorBytes.sliding(26, 26) map extractSector).toList
   }
 
-  def addMiscDataToLevel(level: Level): Level = {
+  private def addMiscDataToLevel(level: Level): Level = {
     val levelWithLines = level.setLines(extractLinesForLevel(level))
     levelWithLines.setPlayerStart(extractPlayerStart(level))
     val levelWithSectors = levelWithLines.setSectors(extractSectorsForLevel(level))
     levelWithSectors
   }
 
-  def extractThing(bytes: List[Byte]): Thing = {
+  private def extractThing(bytes: List[Byte]): Thing = {
     val position = extractVertex(bytes.take(4))
     val angle = ByteBuffer.wrap(bytes.slice(4, 6).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
     val doomId = ByteBuffer.wrap(bytes.slice(6, 8).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
     Thing(position, angle, doomId)
   }
 
-  def extractPlayerStart(level: Level): Vertex = {
+  private def extractPlayerStart(level: Level): Vertex = {
     val thingsLump = level.lumps("THINGS").data
     val things = (thingsLump.sliding(10, 10) map extractThing).toList
     things.find(_.doomId == 1).get.position
   }
 
-  def createWad(): Wad = {
-    val byteStream = createStreamFromFile()
+  def createWad(fromFile: String = "/home/neil/Downloads/doom1.wad"): Wad = {
+    val byteStream = createStream(fromFile)
     val wadType = extractWadType(byteStream)
     val numLumps = extractNumLumps(byteStream)
     val data = extractData(byteStream)

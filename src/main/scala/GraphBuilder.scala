@@ -31,9 +31,9 @@ class PathNode(location: Vertex,
       case _ => false
     }
 
-  def branchOut(seenNodes: List[PathNode]): List[PathNode] = {
+  def branchOut(seenNodes: List[PathNode], drawPath: Boolean): List[PathNode] = {
     edges = edges map {
-      case (direction, None) => (direction, Some(addNewNode(location, direction, this, seenNodes)))
+      case (direction, None) => (direction, Some(addNewNode(location, direction, this, seenNodes, drawPath)))
       case (direction, Some(x)) => (direction, Some(x))
     }
     val pathNodes = extractPathNodes(edges.values.toList.map(_.get))
@@ -43,7 +43,7 @@ class PathNode(location: Vertex,
   def extractPathNodes(allNodes: List[PathNodeTrait]): List[PathNode] = allNodes collect { case s: PathNode => s }
 
   //TODO: handle linking existing node differently (it may exist, but may not have path
-  def addNewNode(start: Vertex, direction: String, fromNode: PathNode, seenNodes: List[PathNode]): PathNodeTrait = {
+  def addNewNode(start: Vertex, direction: String, fromNode: PathNode, seenNodes: List[PathNode], drawPath: Boolean): PathNodeTrait = {
     val proposedLocation = start + PathNode.translations(direction)
     val proposedNode = new PathNode(proposedLocation, level)
     val existingProposedNode = seenNodes.find(_ == proposedNode)
@@ -52,12 +52,19 @@ class PathNode(location: Vertex,
     potentialObstructions foreach {wall =>
       if (proposedLine.intersectsWith(wall)) return new DeadEnd()
     }
-    WadViewUtils.drawPath(proposedLine)
-    WadViewUtils.drawNode(proposedLocation)
+    if (drawPath) {
+      WadViewUtils.drawPathLine(proposedLine)
+      WadViewUtils.drawNode(proposedLocation)
+    }
 
     val newNode = if (existingProposedNode.isDefined) existingProposedNode.get else proposedNode
     newNode.edges = newNode.edges + (PathNode.oppositeDirection(direction) -> Some(fromNode))
     newNode
+  }
+
+  def isCloseEnough(that: PathNode): Boolean = {
+    math.abs(this.location.x - that.getLocation.x) < GraphBuilder.STEP_SIZE &&
+    math.abs(this.location.y - that.getLocation.y) < GraphBuilder.STEP_SIZE
   }
 
   override def toString: String = s"PathNode: $location"
@@ -78,24 +85,24 @@ object GraphBuilder {
   val STEP_SIZE = 70
   val MAX_ITERATIONS = 180
 
-  def genPathForLevel(level: Level): PathNode = {
+  def genGraphForLevel(level: Level, drawPath: Boolean = false): PathNode = {
     val startingPos = new PathNode(level.playerStart.get, level)
-    WadViewUtils.drawNode(startingPos.getLocation, Blue)
+    if (drawPath) WadViewUtils.drawNode(startingPos.getLocation, Blue)
     var newNodes: List[PathNode] = List(startingPos)
     var seenNodes: List[PathNode] = List()
     var iterationCount = 0
     while (iterationCount < MAX_ITERATIONS && newNodes.nonEmpty) {
-      newNodes = branchOutNewNodes(newNodes, seenNodes)
+      newNodes = branchOutNewNodes(newNodes, seenNodes, drawPath)
       seenNodes = seenNodes ++ newNodes
       iterationCount = iterationCount + 1
     }
     startingPos
   }
 
-  def branchOutNewNodes(nodes: List[PathNode], seenNodes: List[PathNode]): List[PathNode] = {
+  def branchOutNewNodes(nodes: List[PathNode], seenNodes: List[PathNode], drawPath: Boolean): List[PathNode] = {
     var seenNodes: List[PathNode] = List()  // nasty, but can't see another way to do this
     val allNewNodes = nodes flatMap { node =>
-      val newNodes = node.branchOut(seenNodes)
+      val newNodes = node.branchOut(seenNodes, drawPath)
       seenNodes = newNodes ::: seenNodes
       newNodes
     }

@@ -54,6 +54,16 @@ object DoomViewer extends JFXApp{
     onMouseClicked = (e: MouseEvent) => Future{WadViewUtils.clearScreen()}
   }
 
+  val startBotButton: Button = new Button {
+    text = "Start Bot"
+    onMouseClicked = (e: MouseEvent) => Future{WadViewUtils.startBot()}
+  }
+
+  val stopBotButton: Button = new Button {
+    text = "Stop Bot"
+    //TODO: how do we stop the bot?
+  }
+
   stage = new application.JFXApp.PrimaryStage {
     width = WadViewUtils.CANVAS_WIDTH + WadViewUtils.BUTTON_BAR_WIDTH + 200
     height = WadViewUtils.CANVAS_HEIGHT
@@ -65,7 +75,7 @@ object DoomViewer extends JFXApp{
           new VBox{
             prefWidth = WadViewUtils.BUTTON_BAR_WIDTH
             children = Seq(loadWadButton, mapComboBox, boundingBoxesButton, showQuadTreeButton, generateGridButton,
-              findPathButton, clearButton)
+              findPathButton, clearButton, startBotButton, stopBotButton)
           },
           mapPane
         )

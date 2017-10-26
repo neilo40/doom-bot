@@ -65,10 +65,10 @@ object WadViewUtils {
 
   def generatePath(): Unit = {
     val level = levels.find(_.name == DoomViewer.mapComboBox.value.value).get
-    val pathNodes = GraphBuilder.genPathForLevel(level)
+    val pathNodes = GraphBuilder.genGraphForLevel(level, drawPath = true)
   }
 
-  def drawPath(line: WadLine): Unit = {
+  def drawPathLine(line: WadLine): Unit = {
     val pathLine = makeLinesForDisplay(List(line), otherColour = Green).head
     Platform.runLater {
       DoomViewer.mapPane.children.add(pathLine)
@@ -89,6 +89,23 @@ object WadViewUtils {
     Platform.runLater {
       showLevel(level)
     }
+  }
+
+  def startBot(): Unit = {
+    val level = levels.find(_.name == DoomViewer.mapComboBox.value.value).get
+    val startingNode = GraphBuilder.genGraphForLevel(level)
+    iterateBot(startingNode, level)
+  }
+
+  def iterateBot(startingNode: PathNode, level: Level): Unit = {
+    Platform.runLater{
+      showLevel(level)
+    }
+    val player = PlayerController.getPlayer
+    drawNode(player.position)
+    val playerNode = AStar.closestNodeTo(startingNode, player.position).get
+    val targetNode = new PathNode(Vertex(1476, -3616), level)
+    AStar.calculatePath(playerNode, targetNode, drawPathOnly = true)
   }
 
   // Private methods
@@ -132,7 +149,7 @@ object WadViewUtils {
     rect
   }
 
-  private def shiftLine(line: WadLine, minX: Int, minY: Int): WadLine = {
+  private def shiftLine(line: WadLine, minX: Double, minY: Double): WadLine = {
     val newAX = line.a.x - minX
     val newAY = line.a.y - minY
     val newBX = line.b.x - minX
@@ -141,7 +158,7 @@ object WadViewUtils {
   }
 
   //Doom origin is SW, screen render origin is NW
-  private def flipYAxis(line: WadLine, maxY: Int): WadLine = {
+  private def flipYAxis(line: WadLine, maxY: Double): WadLine = {
     val newAY = maxY - line.a.y
     val newBY = maxY - line.b.y
     WadLine(Vertex(line.a.x, newAY), Vertex(line.b.x, newBY), line.oneSided)
@@ -156,7 +173,7 @@ object WadViewUtils {
   }
 
   //TODO: avoid duplicate code
-  def getMaxCoords(lines: List[WadLine]): (Int, Int) = {
+  def getMaxCoords(lines: List[WadLine]): (Double, Double) = {
     val maxStartX = lines.map(_.a.x).max
     val maxEndX = lines.map(_.b.x).max
     val maxStartY = lines.map(_.a.y).max
@@ -166,7 +183,7 @@ object WadViewUtils {
     (maxX, maxY)
   }
 
-  def getMinCoords(lines: List[WadLine]): (Int, Int) = {
+  def getMinCoords(lines: List[WadLine]): (Double, Double) = {
     val minStartX = lines.map(_.a.x).min
     val minEndX = lines.map(_.b.x).min
     val minStartY = lines.map(_.a.y).min
