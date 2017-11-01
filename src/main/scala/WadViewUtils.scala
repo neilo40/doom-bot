@@ -94,18 +94,7 @@ object WadViewUtils {
   def startBot(): Unit = {
     val level = levels.find(_.name == DoomViewer.mapComboBox.value.value).get
     val startingNode = GraphBuilder.genGraphForLevel(level)
-    iterateBot(startingNode, level)
-  }
-
-  def iterateBot(startingNode: PathNode, level: Level): Unit = {
-    Platform.runLater{
-      showLevel(level)
-    }
-    val player = PlayerController.getPlayer
-    drawNode(player.position)
-    val playerNode = AStar.closestNodeTo(startingNode, player.position).get
-    val targetNode = new PathNode(Vertex(1476, -3616), level)
-    AStar.calculatePath(playerNode, targetNode, drawPathOnly = true)
+    PlayerController.startBot(startingNode, level)
   }
 
   // Private methods
@@ -224,7 +213,7 @@ object WadViewUtils {
     })
   }
 
-  private def showLevel(level: Level): Unit = {
+  def showLevel(level: Level): Unit = {
     DoomViewer.stage.title = s"Doom Viewer - ${level.name}"
     DoomViewer.mapPane.children = makeLinesForDisplay(level.lines.get)
   }

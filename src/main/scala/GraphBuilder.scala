@@ -62,6 +62,7 @@ class PathNode(location: Vertex,
     newNode
   }
 
+  // pretty dumb.  could do with some refinement
   def isCloseEnough(that: PathNode): Boolean = {
     math.abs(this.location.x - that.getLocation.x) < GraphBuilder.STEP_SIZE &&
     math.abs(this.location.y - that.getLocation.y) < GraphBuilder.STEP_SIZE
@@ -87,7 +88,10 @@ object GraphBuilder {
 
   def genGraphForLevel(level: Level, drawPath: Boolean = false): PathNode = {
     val startingPos = new PathNode(level.playerStart.get, level)
-    if (drawPath) WadViewUtils.drawNode(startingPos.getLocation, Blue)
+    if (drawPath) {
+      WadViewUtils.drawNode(startingPos.getLocation, Blue)
+      WadViewUtils.drawNode(level.exit.get, Blue)
+    }
     var newNodes: List[PathNode] = List(startingPos)
     var seenNodes: List[PathNode] = List()
     var iterationCount = 0

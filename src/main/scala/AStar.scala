@@ -18,7 +18,8 @@ object AStar {
 
   // 1st attempt, taken straight from wikipedia!
   // TODO: make an immutable, functional version
-  def calculatePath(startingNode: PathNode, targetNode: PathNode, drawPathOnly: Boolean = false): Option[PathNode] = {
+  def calculatePath(startingNode: PathNode, targetNode: PathNode, drawPathOnly: Boolean = false,
+                    noDraw: Boolean = false): List[PathNode] = {
     val closedSet = mutable.Set[PathNode]()
     val openSet = mutable.Set(startingNode)
     val cameFrom = mutable.Map[PathNode, PathNode]()
@@ -28,20 +29,18 @@ object AStar {
 
     while (openSet.nonEmpty){
       val currentNode: PathNode = openSet minBy fScore
-      if (currentNode.isCloseEnough(targetNode)) {
-        reconstructPath(cameFrom, currentNode)
-        return Some(currentNode)
-      }
+      if (currentNode.isCloseEnough(targetNode))
+        return reconstructPath(cameFrom, currentNode, noDraw)
 
       openSet.remove(currentNode)
       closedSet.add(currentNode)
-      if (!drawPathOnly) WadViewUtils.drawNode(currentNode.getLocation, Black)
+      if (!drawPathOnly && !noDraw) WadViewUtils.drawNode(currentNode.getLocation, Black)
 
       currentNode.neighbours.foreach { neighbour =>
         if (!closedSet.contains(neighbour)){
           if (!openSet.contains(neighbour)) {
             openSet.add(neighbour)
-            if (!drawPathOnly) WadViewUtils.drawNode(neighbour.getLocation, White)
+            if (!drawPathOnly && !noDraw) WadViewUtils.drawNode(neighbour.getLocation, White)
           }
           val tentativeGScore = gScore(currentNode) + heuristicCostEstimate(currentNode, neighbour)
           if (tentativeGScore < gScore(neighbour)){
@@ -52,20 +51,24 @@ object AStar {
         }
       }
     }
-    None
+    List()
   }
 
-  def reconstructPath(cameFrom: mutable.Map[PathNode, PathNode], endNode: PathNode): Unit = {
+  def reconstructPath(cameFrom: mutable.Map[PathNode, PathNode], endNode: PathNode, noDraw: Boolean): List[PathNode] = {
     var currentNode: PathNode = endNode
+    var path: List[PathNode] = List(endNode)
     while (cameFrom.contains(currentNode)){
-      WadViewUtils.drawNode(currentNode.getLocation, Yellow)
+      if (!noDraw) WadViewUtils.drawNode(currentNode.getLocation, Yellow)
       currentNode = cameFrom(currentNode)
+      path = currentNode :: path
     }
-    WadViewUtils.drawNode(currentNode.getLocation, Yellow)
+    if (!noDraw) WadViewUtils.drawNode(currentNode.getLocation, Yellow)
+    path
   }
 
   def closestNodeTo(startingNode: PathNode, target: Vertex): Option[PathNode] = {
-    calculatePath(startingNode, new PathNode(target, startingNode.getLevel), drawPathOnly = true)
+    // super inefficient.  better way to do it?
+    calculatePath(startingNode, new PathNode(target, startingNode.getLevel), noDraw = true).lastOption
   }
 
   def findPathCallback(): Unit = {
