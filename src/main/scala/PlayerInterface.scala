@@ -5,7 +5,7 @@ import math._
 
 object PlayerInterface {
   val baseUrl = "http://localhost:6001/api"
-  val ENEMY_IDS = List(3004, 2035, 3001)
+  val ENEMY_IDS = List(3004, 3001)  // 2035=barrel
   val threatThreshold = 400
   val doorThreshold = 150
 
@@ -68,6 +68,12 @@ object PlayerInterface {
   def getObjects(distance: Int = threatThreshold): List[Object] = {
     val resp = Http(s"$baseUrl/world/objects").param("distance", distance.toString).asString
     resp.body.parseJson.convertTo[List[Object]]
+  }
+
+  def getAllBarrels: List[Object] = {
+    val resp = Http(s"$baseUrl/world/objects").asString
+    val allObjects = resp.body.parseJson.convertTo[List[Object]]
+    allObjects.filter(_.typeId == 2035)
   }
 
   def nearbyThreat(player: Player, objects: List[Object]): Option[Object] = {

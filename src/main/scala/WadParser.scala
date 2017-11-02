@@ -17,6 +17,9 @@ case class Level(name: String, lumps: Map[String, Lump], lines: Option[List[WadL
   def setLines(lines: List[WadLine]): Level =
     Level(this.name, this.lumps, Some(lines), this.quadTree, this.playerStart, this.sectors, this.exit)
 
+  def addLines(lines: List[WadLine]): Level =
+    Level(this.name, this.lumps, Some(lines ::: this.lines.getOrElse(List())), this.quadTree, this.playerStart, this.sectors, this.exit)
+
   def setSectors(sectors: List[Sector]): Level =
     Level(this.name, this.lumps, this.lines, this.quadTree, this.playerStart, Some(sectors), this.exit)
 

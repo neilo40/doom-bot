@@ -86,15 +86,11 @@ object WadViewUtils {
 
   def clearScreen(): Unit = {
     val level = levels.find(_.name == DoomViewer.mapComboBox.value.value).get
-    Platform.runLater {
-      showLevel(level)
-    }
+    showLevel(level)
   }
 
   def startBot(): Unit = {
-    val level = levels.find(_.name == DoomViewer.mapComboBox.value.value).get
-    val startingNode = GraphBuilder.genGraphForLevel(level)
-    PlayerController.startBot(startingNode, level)
+    PlayerController.startBot()
   }
 
   // Private methods
@@ -214,7 +210,9 @@ object WadViewUtils {
   }
 
   def showLevel(level: Level): Unit = {
-    DoomViewer.stage.title = s"Doom Viewer - ${level.name}"
-    DoomViewer.mapPane.children = makeLinesForDisplay(level.lines.get)
+    Platform.runLater {
+      DoomViewer.stage.title = s"Doom Viewer - ${level.name}"
+      DoomViewer.mapPane.children = makeLinesForDisplay(level.lines.get)
+    }
   }
 }

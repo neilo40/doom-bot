@@ -3,10 +3,29 @@ import math._
 import scalafx.scene.paint.Color.Green
 
 object PlayerController {
+  val barrelSize = 60
 
-  def startBot(startingNode: PathNode, level: Level): Unit = {
-    var currentNode: PathNode = startingNode
+  def startBot(): Unit = {
+    val level = WadViewUtils.levels.find(_.name == DoomViewer.mapComboBox.value.value).get
+    val barrelLines = PlayerInterface.getAllBarrels flatMap barrelToLines
+    val levelWithBarrels = level.addLines(barrelLines)
+    levelWithBarrels.quadTree = Some(LineMXQuadTree.createQuadTree(levelWithBarrels))
+    WadViewUtils.showLevel(levelWithBarrels)
+    val startingNode = GraphBuilder.genGraphForLevel(levelWithBarrels)
+    var currentNode = startingNode
     while (true) currentNode = iterateBot(currentNode, level)
+  }
+
+  // Convert a barrel to a bounding box of one-sided lines
+  def barrelToLines(barrel: Object): List[WadLine] = {
+    val x = barrel.position.x
+    val y = barrel.position.y
+    List(
+      WadLine(Vertex(x - barrelSize, y - barrelSize), Vertex(x + barrelSize, y - barrelSize), oneSided = true),
+      WadLine(Vertex(x + barrelSize, y - barrelSize), Vertex(x + barrelSize, y + barrelSize), oneSided = true),
+      WadLine(Vertex(x + barrelSize, y + barrelSize), Vertex(x - barrelSize, y + barrelSize), oneSided = true),
+      WadLine(Vertex(x - barrelSize, y + barrelSize), Vertex(x - barrelSize, y - barrelSize), oneSided = true)
+    )
   }
 
   // This is the main player loop
