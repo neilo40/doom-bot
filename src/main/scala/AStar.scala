@@ -34,13 +34,13 @@ object AStar {
 
       openSet.remove(currentNode)
       closedSet.add(currentNode)
-      if (!drawPathOnly && !noDraw) WadViewUtils.drawNode(currentNode.getLocation, Black)
+      if (!drawPathOnly && !noDraw) ViewController.drawNode(currentNode.getLocation, Black)
 
       currentNode.neighbours.foreach { neighbour =>
         if (!closedSet.contains(neighbour)){
           if (!openSet.contains(neighbour)) {
             openSet.add(neighbour)
-            if (!drawPathOnly && !noDraw) WadViewUtils.drawNode(neighbour.getLocation, White)
+            if (!drawPathOnly && !noDraw) ViewController.drawNode(neighbour.getLocation, White)
           }
           val tentativeGScore = gScore(currentNode) + heuristicCostEstimate(currentNode, neighbour)
           if (tentativeGScore < gScore(neighbour)){
@@ -58,11 +58,11 @@ object AStar {
     var currentNode: PathNode = endNode
     var path: List[PathNode] = List(endNode)
     while (cameFrom.contains(currentNode)){
-      if (!noDraw) WadViewUtils.drawNode(currentNode.getLocation, Yellow)
+      if (!noDraw) ViewController.drawNode(currentNode.getLocation, Yellow)
       currentNode = cameFrom(currentNode)
       path = currentNode :: path
     }
-    if (!noDraw) WadViewUtils.drawNode(currentNode.getLocation, Yellow)
+    if (!noDraw) ViewController.drawNode(currentNode.getLocation, Yellow)
     path
   }
 
@@ -76,7 +76,7 @@ object AStar {
     //TODO: make this selectable on the UI
     val targetNode = new PathNode(Vertex(1476, -3616), startingNode.getLevel)
     //val targetNode = getStartingNode.north.get.north.get.east.get.north.get
-    WadViewUtils.drawNode(targetNode.getLocation, Blue)
+    ViewController.drawNode(targetNode.getLocation, Blue)
     calculatePath(startingNode, targetNode)
   }
 }

@@ -13,35 +13,40 @@ import scala.concurrent.ExecutionContext.Implicits.global
 object DoomViewer extends JFXApp{
 
   val mapPane: Pane = new Pane{
-    onMouseClicked = (e: MouseEvent) => WadViewUtils.paneClicked(e.x, e.y)
+    onMouseClicked = (e: MouseEvent) => ViewController.paneClicked(e.x, e.y)
   }
 
   val boundingBoxesButton: ToggleButton = new ToggleButton{
     text = "Show Bounds"
-    onMouseClicked = (e: MouseEvent) => WadViewUtils.boundingBoxToggle(this.selected.value)
+    onMouseClicked = (e: MouseEvent) => ViewController.boundingBoxToggle(this.selected.value)
   }
 
   val showQuadTreeButton: ToggleButton = new ToggleButton{
     text = "Show QuadTree"
-    onMouseClicked = (e: MouseEvent) => WadViewUtils.quadTreeToggle(this.selected.value)
+    onMouseClicked = (e: MouseEvent) => ViewController.quadTreeToggle(this.selected.value)
   }
 
   val mapComboBox: ComboBox[String] = new ComboBox[String]{
     onAction = (e: ActionEvent) => {
       boundingBoxesButton.selected = false
       showQuadTreeButton.selected = false
-      WadViewUtils.changeLevel(this.value.value)
+      ViewController.changeLevel(this.value.value)
     }
+  }
+
+  val drawObjectsButton: Button = new Button {
+    text = "Draw Objects"
+    onMouseClicked = (e: MouseEvent) => Future {ViewController.drawWorldObjects()}
   }
 
   val loadWadButton: Button = new Button {
     text = "Reload Wad"
-    onMouseClicked = (e: MouseEvent) => Future {WadViewUtils.loadWad()}
+    onMouseClicked = (e: MouseEvent) => Future {ViewController.loadWad()}
   }
 
   val generateGridButton: Button = new Button {
     text = "Generate Grid"
-    onMouseClicked = (e: MouseEvent) => Future {WadViewUtils.generatePath()}
+    onMouseClicked = (e: MouseEvent) => Future {ViewController.generatePath()}
   }
 
   val findPathButton: Button = new Button {
@@ -51,31 +56,36 @@ object DoomViewer extends JFXApp{
 
   val clearButton: Button = new Button {
     text = "Clear"
-    onMouseClicked = (e: MouseEvent) => Future{WadViewUtils.clearScreen()}
+    onMouseClicked = (e: MouseEvent) => Future{ViewController.clearScreen()}
   }
 
   val startBotButton: Button = new Button {
     text = "Start Bot"
-    onMouseClicked = (e: MouseEvent) => Future{WadViewUtils.startBot()}
+    onMouseClicked = (e: MouseEvent) => {
+      ViewController.botRunning = true
+      Future{ViewController.startBot()}
+    }
   }
 
   val stopBotButton: Button = new Button {
     text = "Stop Bot"
-    //TODO: how do we stop the bot?
+    onMouseClicked = (e: MouseEvent) => {
+      ViewController.botRunning = false
+    }
   }
 
   stage = new application.JFXApp.PrimaryStage {
-    width = WadViewUtils.CANVAS_WIDTH + WadViewUtils.BUTTON_BAR_WIDTH + 200
-    height = WadViewUtils.CANVAS_HEIGHT
+    width = ViewController.CANVAS_WIDTH + ViewController.BUTTON_BAR_WIDTH + 200
+    height = ViewController.CANVAS_HEIGHT
     title = "Doom Viewer"
     scene = new Scene {
       fill = White
       content = new HBox {
         children = Seq(
           new VBox{
-            prefWidth = WadViewUtils.BUTTON_BAR_WIDTH
-            children = Seq(loadWadButton, mapComboBox, boundingBoxesButton, showQuadTreeButton, generateGridButton,
-              findPathButton, clearButton, startBotButton, stopBotButton)
+            prefWidth = ViewController.BUTTON_BAR_WIDTH
+            children = Seq(loadWadButton, mapComboBox, drawObjectsButton, boundingBoxesButton, showQuadTreeButton,
+              generateGridButton, findPathButton, clearButton, startBotButton, stopBotButton)
           },
           mapPane
         )
@@ -84,5 +94,5 @@ object DoomViewer extends JFXApp{
   }
 
   stage.show()
-  WadViewUtils.loadWad()
+  ViewController.loadWad()
 }

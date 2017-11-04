@@ -7,11 +7,12 @@ import scalafx.collections.ObservableBuffer
 import scalafx.scene.Node
 import scalafx.scene.paint.Color
 
-object WadViewUtils {
+object ViewController {
   val CANVAS_WIDTH = 1024
   val CANVAS_HEIGHT = 1024
   val BUTTON_BAR_WIDTH = 200
   var levels: List[Level] = List()
+  var botRunning = true
 
   // Callbacks
 
@@ -27,6 +28,7 @@ object WadViewUtils {
 
   def changeLevel(name: String): Unit = {
     val level = levels.find(_.name == name)
+    PlayerInterface.changeLevel(name(1), name(3))
     showLevel(level.getOrElse(levels.head))
   }
 
@@ -91,6 +93,15 @@ object WadViewUtils {
 
   def startBot(): Unit = {
     PlayerController.startBot()
+  }
+
+  def drawWorldObjects(): Unit = {
+    val doors = PlayerInterface.getAllDoors
+    val doorLines = doors.map(door => WadLine(door.line.v1, door.line.v2, oneSided = false))
+    val screenDoorLines = makeLinesForDisplay(doorLines, otherColour = Red)
+    Platform.runLater {
+      screenDoorLines.foreach { DoomViewer.mapPane.children.add(_) }
+    }
   }
 
   // Private methods

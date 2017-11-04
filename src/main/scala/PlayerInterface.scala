@@ -5,15 +5,24 @@ import math._
 
 object PlayerInterface {
   val baseUrl = "http://localhost:6001/api"
-  val ENEMY_IDS = List(3004, 3001)  // 2035=barrel
+  val enemyIds = List(3004, 3001)  // 2035=barrel
   val threatThreshold = 400
   val doorThreshold = 150
+  val keyCardIds = List(5, 6, 13)
 
   private def post(action: String, data: String): HttpResponse[String] =
     Http(s"$baseUrl/$action").postData(data).header("content-type", "application/json").asString
 
+  private def patch(action: String, data: String): HttpResponse[String] =
+    Http(s"$baseUrl/$action").postData(data).method("PATCH").header("content-type", "application/json").asString
+
   private def get(action: String): HttpResponse[String] =
     Http(s"$baseUrl/$action").asString
+
+  def changeLevel(episode: Char, map: Char): Unit = {
+    val jsonData = "{\"episode\": " + episode + ", \"map\": " + map + "}"
+    patch("world", jsonData)
+  }
 
   def getPlayer: Player = {
     val playerJsonString = get("player").body
@@ -62,7 +71,23 @@ object PlayerInterface {
   def isNearClosedDoor(player: Player): Boolean = {
     val resp = Http(s"$baseUrl/world/doors").param("distance", doorThreshold.toString).asString
     val doors = resp.body.parseJson.convertTo[List[Door]]
-    doors.nonEmpty && doors.maxBy(_.distance).state == "closed"
+    doors.nonEmpty && doors.maxBy(_.distance).state == "closed"  // this is not reliable
+  }
+
+  // get all doors that are locked for which we don't have the key yet
+  def lockedDoors(player: Player): List[Door] = {
+    getAllDoors.filter {door =>
+      door.keyRequired != "none" && !hasKey(player, door.keyRequired)
+    }
+  }
+
+  def hasKey(player: Player, key: String): Boolean = {
+    key match {
+      case "blue" => player.keyCards.blue
+      case "red" => player.keyCards.red
+      case "yellow" => player.keyCards.yellow
+      case _ => false
+    }
   }
 
   def getObjects(distance: Int = threatThreshold): List[Object] = {
@@ -70,16 +95,22 @@ object PlayerInterface {
     resp.body.parseJson.convertTo[List[Object]]
   }
 
-  def getAllBarrels: List[Object] = {
-    val resp = Http(s"$baseUrl/world/objects").asString
-    val allObjects = resp.body.parseJson.convertTo[List[Object]]
-    allObjects.filter(_.typeId == 2035)
-  }
+  def getAllObjects: List[Object] = get("world/objects").body.parseJson.convertTo[List[Object]]
+
+  def getAllKeys: List[Object] = getAllObjects.filter { obj => keyCardIds.contains(obj.typeId) }
+
+  def getKey(colour: String): Option[Object] =
+    getAllKeys find {key => key.typeString.toLowerCase.contains(colour)}
+
+  def getAllBarrels: List[Object] = getAllObjects.filter(_.typeId == 2035)
+
+  def getAllDoors: List[Door] = get("world/doors").body.parseJson.convertTo[List[Door]]
 
   def nearbyThreat(player: Player, objects: List[Object]): Option[Object] = {
     val aliveEnemies = objects.filter({obj =>
-      ENEMY_IDS.contains(obj.typeId) && obj.health > 0 && canSee(player, obj)
+      enemyIds.contains(obj.typeId) && obj.health > 0 && canSee(player, obj)
     })
     aliveEnemies.sortBy(_.distance).headOption
   }
+
 }

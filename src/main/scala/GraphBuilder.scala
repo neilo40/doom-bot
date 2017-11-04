@@ -53,8 +53,8 @@ class PathNode(location: Vertex,
       if (proposedLine.intersectsWith(wall)) return new DeadEnd()
     }
     if (drawPath) {
-      WadViewUtils.drawPathLine(proposedLine)
-      WadViewUtils.drawNode(proposedLocation)
+      ViewController.drawPathLine(proposedLine)
+      ViewController.drawNode(proposedLocation)
     }
 
     val newNode = if (existingProposedNode.isDefined) existingProposedNode.get else proposedNode
@@ -83,14 +83,14 @@ class DeadEnd extends PathNodeTrait
 
 object GraphBuilder {
 
-  val STEP_SIZE = 70
+  val STEP_SIZE = 50
   val MAX_ITERATIONS = 180
 
   def genGraphForLevel(level: Level, drawPath: Boolean = false): PathNode = {
     val startingPos = new PathNode(level.playerStart.get, level)
     if (drawPath) {
-      WadViewUtils.drawNode(startingPos.getLocation, Blue)
-      WadViewUtils.drawNode(level.exit.get, Blue)
+      ViewController.drawNode(startingPos.getLocation, Blue)
+      ViewController.drawNode(level.exit.get, Blue)
     }
     var newNodes: List[PathNode] = List(startingPos)
     var seenNodes: List[PathNode] = List()

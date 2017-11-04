@@ -1,19 +1,22 @@
-import WadViewUtils.drawNode
+import ViewController.drawNode
 import math._
 import scalafx.scene.paint.Color.Green
 
 object PlayerController {
   val barrelSize = 60
+  val lookAhead = 8 // How far in the path to look ahead
 
   def startBot(): Unit = {
-    val level = WadViewUtils.levels.find(_.name == DoomViewer.mapComboBox.value.value).get
+    val level = ViewController.levels.find(_.name == DoomViewer.mapComboBox.value.value).get
     val barrelLines = PlayerInterface.getAllBarrels flatMap barrelToLines
     val levelWithBarrels = level.addLines(barrelLines)
     levelWithBarrels.quadTree = Some(LineMXQuadTree.createQuadTree(levelWithBarrels))
-    WadViewUtils.showLevel(levelWithBarrels)
+    ViewController.showLevel(levelWithBarrels)
     val startingNode = GraphBuilder.genGraphForLevel(levelWithBarrels)
     var currentNode = startingNode
-    while (true) currentNode = iterateBot(currentNode, level)
+    val keys = PlayerInterface.getAllKeys
+
+    while (ViewController.botRunning) currentNode = iterateBot(currentNode, level, keys)
   }
 
   // Convert a barrel to a bounding box of one-sided lines
@@ -29,9 +32,13 @@ object PlayerController {
   }
 
   // This is the main player loop
-  def iterateBot(currentNode: PathNode, level: Level): PathNode = {
-    val targetNode = new PathNode(level.exit.get, level)  // This may change during the level, but not for E1M1
+  def iterateBot(currentNode: PathNode, level: Level, keys: List[Object]): PathNode = {
     val player = PlayerInterface.getPlayer
+    val lockedDoors = PlayerInterface.lockedDoors(player)
+    //expensive to do this every cycle.  Only do at start, and when a key is picked up?
+    val targetNode =
+      if (lockedDoors.nonEmpty) new PathNode(PlayerInterface.getKey(lockedDoors.head.keyRequired).get.position, level)
+      else new PathNode(level.exit.get, level)
     val playerNode = AStar.closestNodeTo(currentNode, player.position).getOrElse(currentNode)
     if (playerNode.isCloseEnough(targetNode)) PlayerInterface.use()
     if (PlayerInterface.isNearClosedDoor(player)) PlayerInterface.use()
@@ -52,9 +59,9 @@ object PlayerController {
 
   // Look ahead in the path and see if we can skip some nodes
   def getNextNode(path: List[PathNode], player: Player): PathNode = {
-    var accessibleNode = path.tail.head
-    path.slice(1, 5).foreach { node =>
-      accessibleNode = if (PlayerInterface.canMoveTo(player, node.getLocation)) node else accessibleNode
+    val accessibleNode = path.tail.head
+    path.slice(1, lookAhead).reverse.foreach { node =>
+      if (PlayerInterface.canMoveTo(player, node.getLocation)) return node
     }
     accessibleNode
   }

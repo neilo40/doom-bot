@@ -98,8 +98,8 @@ object LineMXQuadTree {
   val MAX_DEPTH = 3
 
   def createQuadTree(level: Level): LineMXQuadTree = {
-    val (maxX, maxY) = WadViewUtils.getMaxCoords(level.lines.get)
-    val (minX, minY) = WadViewUtils.getMinCoords(level.lines.get)
+    val (maxX, maxY) = ViewController.getMaxCoords(level.lines.get)
+    val (minX, minY) = ViewController.getMinCoords(level.lines.get)
     val levelBounds = WadLine(Vertex(minX - 1, minY - 1), Vertex(maxX + 1, maxY + 1), oneSided = false)
     val quadTree = new LineMXQuadTree(levelBounds)
     val outsideLines = allExternalLines(level)
