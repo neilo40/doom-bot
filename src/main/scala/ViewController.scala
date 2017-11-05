@@ -1,4 +1,4 @@
-import scalafx.scene.paint.Color.{Black, Green, LightGrey, Red, Transparent}
+import scalafx.scene.paint.Color._
 import scalafx.scene.shape.{Circle, Line, Rectangle}
 import javafx.scene.shape.{Circle => JavaFxCircle, Line => JavaFxLine, Rectangle => JavaFxRectangle}
 
@@ -11,48 +11,45 @@ object ViewController {
   val CANVAS_WIDTH = 1024
   val CANVAS_HEIGHT = 1024
   val BUTTON_BAR_WIDTH = 200
-  var levels: List[Level] = List()
-  var botRunning = true
+  var LEVELS: List[Level] = List()
+  var BOT_RUNNING = true
 
   // Callbacks
 
   def loadWad(): Unit = {
     val wad = WadParser.createWad()
-    levels = wad.levels
-    val levelNames = levels.map(_.name)
+    LEVELS = wad.levels
+    val levelNames = LEVELS.map(_.name)
     Platform.runLater {
       DoomViewer.mapComboBox.items = ObservableBuffer(levelNames)
-      DoomViewer.mapComboBox.value = levels.head.name // default to the first map
+      DoomViewer.mapComboBox.value = LEVELS.head.name // default to the first map
     }
   }
 
   def changeLevel(name: String): Unit = {
-    val level = levels.find(_.name == name)
-    PlayerInterface.changeLevel(name(1), name(3))
-    showLevel(level.getOrElse(levels.head))
+    val level = LEVELS.find(_.name == name)
+    showLevel(level.getOrElse(LEVELS.head))
+    PlayerInterface.changeLevel(name(1), name(3))   // This fails if the game isn't running
   }
 
   def boundingBoxToggle(showBoxes: Boolean): Unit = {
-    val level = levels.find(_.name == DoomViewer.mapComboBox.value.value).get
     if (showBoxes){
-      val lines = fitLinesToScreen(LineMXQuadTree.allExternalLines(level))
+      val lines = fitLinesToScreen(LineMXQuadTree.allExternalLines(getLevel))
       val boxes = lines.map(lineToRect(_, Red))
       boxes.foreach{DoomViewer.mapPane.children.add(_)}
     } else {
-      showLevel(level)
+      showLevel(getLevel)
     }
   }
 
-  def quadTreeToggle(shouldShowQuadTree: Boolean): Unit = {
-    val level = levels.find(_.name == DoomViewer.mapComboBox.value.value).get
-    if (shouldShowQuadTree) showQuadTree(level)
-    else showLevel(level)
-  }
+  def quadTreeToggle(shouldShowQuadTree: Boolean): Unit =
+    if (shouldShowQuadTree) showQuadTree(getLevel)
+    else showLevel(getLevel)
 
   def paneClicked(x: Double, y: Double): Unit = {
+    val wadPoint = screenPointToWadPoint(x, y)
     if (DoomViewer.showQuadTreeButton.selected.value) {
-      val level = levels.find(_.name == DoomViewer.mapComboBox.value.value).get
-      val wadPoint = screenPointToWadPoint(x, y)
+      val level = LEVELS.find(_.name == DoomViewer.mapComboBox.value.value).get
       val lines = level.quadTree.get.getLinesForPoint(wadPoint)
       if (lines.nonEmpty) {
         showLevel(level)
@@ -62,13 +59,12 @@ object ViewController {
           DoomViewer.mapPane.children.add(_)
         }
       }
+    } else {
+      println(s"x: ${wadPoint.x}, y: ${wadPoint.y}")
     }
   }
 
-  def generatePath(): Unit = {
-    val level = levels.find(_.name == DoomViewer.mapComboBox.value.value).get
-    val pathNodes = GraphBuilder.genGraphForLevel(level, drawPath = true)
-  }
+  def generatePath(): Unit = GraphBuilder.genGraphForLevel(getLevel, drawPath = true)
 
   def drawPathLine(line: WadLine): Unit = {
     val pathLine = makeLinesForDisplay(List(line), otherColour = Green).head
@@ -86,25 +82,35 @@ object ViewController {
     }
   }
 
-  def clearScreen(): Unit = {
-    val level = levels.find(_.name == DoomViewer.mapComboBox.value.value).get
-    showLevel(level)
-  }
+  def clearScreen(): Unit = showLevel(getLevel)
 
   def startBot(): Unit = {
     PlayerController.startBot()
   }
 
   def drawWorldObjects(): Unit = {
+    //Doors from the game engine
     val doors = PlayerInterface.getAllDoors
     val doorLines = doors.map(door => WadLine(door.line.v1, door.line.v2, oneSided = false))
     val screenDoorLines = makeLinesForDisplay(doorLines, otherColour = Red)
+    //Platform.runLater {
+    //  screenDoorLines.foreach { DoomViewer.mapPane.children.add(_) }
+    //}
+
+    //Doors from the WAD
+    val doorSwitches = WadParser.doorLinedefs(getLevel)
+    val doorLinedefs = doorSwitches.map(switch => WadLine(switch.a, switch.b, oneSided = false))
+    val screenDoorLinedefs = makeLinesForDisplay(doorLinedefs, colour = Magenta, otherColour = Magenta)
     Platform.runLater {
-      screenDoorLines.foreach { DoomViewer.mapPane.children.add(_) }
+      screenDoorLinedefs.foreach { DoomViewer.mapPane.children.add(_) }
     }
   }
 
   // Private methods
+
+  def getLevel: Level = {
+    LEVELS.find(_.name == DoomViewer.mapComboBox.value.value).get
+  }
 
   private def showQuadTree(level: Level): Unit = {
     val quadTree = level.quadTree.get
@@ -123,7 +129,7 @@ object ViewController {
 
   private def screenPointToWadPoint(x: Double, y: Double): Vertex = {
     //TODO: use getLevelBounds()
-    val level = levels.find(_.name == DoomViewer.mapComboBox.value.value).get
+    val level = LEVELS.find(_.name == DoomViewer.mapComboBox.value.value).get
     val (minX, minY) = getMinCoords(level.lines.get)
     val (maxX, maxY) = getMaxCoords(level.lines.get)
     val factor = (maxX - minX) / CANVAS_WIDTH
@@ -198,7 +204,7 @@ object ViewController {
   }
 
   private def getLevelBounds: (WadLine, Double) = {
-    val level = levels.find(_.name == DoomViewer.mapComboBox.value.value).get
+    val level = LEVELS.find(_.name == DoomViewer.mapComboBox.value.value).get
     val (minX, minY) = getMinCoords(level.lines.get)
     val (maxX, maxY) = getMaxCoords(level.lines.get)
     val factor = (maxX - minX) / CANVAS_WIDTH

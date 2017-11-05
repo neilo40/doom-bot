@@ -62,11 +62,8 @@ class PathNode(location: Vertex,
     newNode
   }
 
-  // pretty dumb.  could do with some refinement
-  def isCloseEnough(that: PathNode): Boolean = {
-    math.abs(this.location.x - that.getLocation.x) < GraphBuilder.STEP_SIZE &&
-    math.abs(this.location.y - that.getLocation.y) < GraphBuilder.STEP_SIZE
-  }
+  def isCloseEnough(that: PathNode): Boolean = this.getLocation.isCloseTo(that.getLocation, GraphBuilder.STEP_SIZE)
+  def isCloseEnoughToUse(that: PathNode): Boolean = this.getLocation.isCloseTo(that.getLocation, 100)
 
   override def toString: String = s"PathNode: $location"
 }

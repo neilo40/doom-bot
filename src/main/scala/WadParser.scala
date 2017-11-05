@@ -2,66 +2,11 @@ import java.io.{File, FileInputStream}
 import java.nio.{ByteBuffer, ByteOrder, MappedByteBuffer}
 import java.nio.channels.FileChannel.MapMode._
 
-case class Wad(wadType: String, numLumps: Int, levels: List[Level]) {
-  override def toString: String = "[Wad] type: " + wadType + ", lumps: " + numLumps + ", levels: " + levels
-}
-
-case class Level(name: String, lumps: Map[String, Lump], lines: Option[List[WadLine]] = None,
-                 var quadTree: Option[LineMXQuadTree] = None, var playerStart: Option[Vertex] = None,
-                var sectors: Option[List[Sector]] = None, var exit: Option[Vertex] = None){
-  def addLump(lump: Lump): Level = {
-    val newLumps: Map[String, Lump] = lumps + (lump.name -> lump)
-    Level(this.name, newLumps, this.lines, this.quadTree, this.playerStart, this.sectors, this.exit)
-  }
-
-  def setLines(lines: List[WadLine]): Level =
-    Level(this.name, this.lumps, Some(lines), this.quadTree, this.playerStart, this.sectors, this.exit)
-
-  def addLines(lines: List[WadLine]): Level =
-    Level(this.name, this.lumps, Some(lines ::: this.lines.getOrElse(List())), this.quadTree, this.playerStart, this.sectors, this.exit)
-
-  def setSectors(sectors: List[Sector]): Level =
-    Level(this.name, this.lumps, this.lines, this.quadTree, this.playerStart, Some(sectors), this.exit)
-
-  def setPlayerStart(v: Vertex): Unit = this.playerStart = Some(v)
-
-  def setExit(v: Vertex): Unit = this.exit = Some(v)
-
-  override def toString: String = "[Level] name: " + name
-}
-
-case class Lump(name: String, data: List[Byte]) {
-  override def toString: String = "[Lump] name: " + name
-}
-
-case class WadLine(a: Vertex, b: Vertex, oneSided: Boolean, sectorTag: Option[Int] = None, lineType: Option[Int] = None) {
-  override def toString: String = s"[Line] $a <-> $b, oneSided: $oneSided"
-
-  def intersectsWith(that: WadLine): Boolean = {
-    val denom: Double = (that.b.y - that.a.y) * (this.b.x - this.a.x) - (that.b.x - that.a.x) * (this.b.y - this.a.y)
-    if (denom == 0.0) return false
-    val ua: Double = ((that.b.x - that.a.x) * (this.a.y - that.a.y) - (that.b.y - that.a.y) * (this.a.x - that.a.x)) / denom
-    val ub: Double = ((this.b.x - this.a.x) * (this.a.y - that.a.y) - (this.b.y - this.a.y) * (this.a.x - that.a.x)) / denom
-    if (ua >= 0.0 && ua <= 1.0 && ub >= 0.0 && ub <= 1.0) return true
-    false
-  }
-}
-
-case class Vertex(x: Double, y: Double) {
-  override def toString: String = s"($x, $y)"
-
-  def +(that: Vertex): Vertex = {
-    Vertex(x + that.x, y + that.y)
-  }
-}
-
-case class Thing(position: Vertex, facing: Int, doomId: Int)
-
-case class Sector(sectorType: Int, tag: Int)
-
-
 object WadParser {
   val HEADER_SIZE = 12
+  val DOOR_LINEDEF_TYPES = List(1, 117, 63, 114, 29, 111, 90, 105, 4, 108, 31, 118, 61, 115, 103, 112, 86, 106,
+    2, 109, 46, 42, 116, 50, 113, 75, 107, 3, 110, 196, 175, 76, 16)
+  val DOOR_SWITCH_TYPES = List(103)
 
   private def createStream(fromFile: String): MappedByteBuffer = {
     val file = new File(fromFile)
@@ -187,10 +132,16 @@ object WadParser {
     }
   }
 
+  def doorLinedefs(level: Level): List[DoorSwitch] = {
+    val doorLines = level.lines.getOrElse(List()).filter(line => DOOR_SWITCH_TYPES.contains(line.lineType.getOrElse(-1)))
+    doorLines map DoorSwitch.fromWadLine
+  }
+
   private def addMiscDataToLevel(level: Level): Level = {
     val levelWithLines = level.setLines(extractLinesForLevel(level))
     levelWithLines.setPlayerStart(extractPlayerStart(level))
     levelWithLines.setExit(extractExit(levelWithLines))
+    levelWithLines.setDoorSwitches(doorLinedefs(levelWithLines))
     val levelWithSectors = levelWithLines.setSectors(extractSectorsForLevel(level))
     levelWithSectors
   }

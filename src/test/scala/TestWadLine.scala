@@ -14,4 +14,8 @@ class TestWadLine extends FlatSpec with Matchers {
     intersects should be (true)
   }
 
+  "The midpoint of Line (0, 0) -> (10, 10)" should "be (5, 5)" in {
+    val line = WadLine(Vertex(0, 0), Vertex(10, 10), oneSided = false)
+    line.midpoint should be (Vertex(5, 5))
+  }
 }

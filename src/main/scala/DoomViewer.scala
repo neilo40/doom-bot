@@ -30,7 +30,7 @@ object DoomViewer extends JFXApp{
     onAction = (e: ActionEvent) => {
       boundingBoxesButton.selected = false
       showQuadTreeButton.selected = false
-      ViewController.changeLevel(this.value.value)
+      Future {ViewController.changeLevel(this.value.value)}
     }
   }
 
@@ -51,7 +51,7 @@ object DoomViewer extends JFXApp{
 
   val findPathButton: Button = new Button {
     text = "Find Path"
-    onMouseClicked = (e: MouseEvent) => Future {AStar.findPathCallback()}
+    onMouseClicked = (e: MouseEvent) => Future {AStar.findPathCallback(ViewController.getLevel)}
   }
 
   val clearButton: Button = new Button {
@@ -62,15 +62,16 @@ object DoomViewer extends JFXApp{
   val startBotButton: Button = new Button {
     text = "Start Bot"
     onMouseClicked = (e: MouseEvent) => {
-      ViewController.botRunning = true
+      ViewController.BOT_RUNNING = true
       Future{ViewController.startBot()}
+      //ViewController.startBot()  // use this line to get stacktrace if the bot crashes
     }
   }
 
   val stopBotButton: Button = new Button {
     text = "Stop Bot"
     onMouseClicked = (e: MouseEvent) => {
-      ViewController.botRunning = false
+      ViewController.BOT_RUNNING = false
     }
   }
 

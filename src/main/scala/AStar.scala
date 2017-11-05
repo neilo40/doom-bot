@@ -4,9 +4,9 @@ import scala.math.sqrt
 
 object AStar {
 
-  def getStartingNode: PathNode = {
+  def getStartingNode(level: Level): PathNode = {
     def wad = WadParser.createWad()
-    GraphBuilder.genGraphForLevel(wad.levels.head)
+    GraphBuilder.genGraphForLevel(level)
   }
 
   // Simple straight line from node to target
@@ -71,11 +71,9 @@ object AStar {
     calculatePath(startingNode, new PathNode(target, startingNode.getLevel), noDraw = true).lastOption
   }
 
-  def findPathCallback(): Unit = {
-    val startingNode = getStartingNode
-    //TODO: make this selectable on the UI
-    val targetNode = new PathNode(Vertex(1476, -3616), startingNode.getLevel)
-    //val targetNode = getStartingNode.north.get.north.get.east.get.north.get
+  def findPathCallback(level: Level): Unit = {
+    val startingNode = getStartingNode(level)
+    val targetNode = new PathNode(level.exit.get, startingNode.getLevel)
     ViewController.drawNode(targetNode.getLocation, Blue)
     calculatePath(startingNode, targetNode)
   }
