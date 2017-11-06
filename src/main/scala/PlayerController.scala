@@ -35,6 +35,7 @@ object PlayerController {
   // This is the main player loop
   def iterateBot(currentNode: PathNode, level: Level, keys: List[Object]): PathNode = {
     val player = PlayerInterface.getPlayer
+    if (player.health <= 0) ViewController.BOT_RUNNING = false
     val lockedDoors = PlayerInterface.lockedDoors(player)
     val targetNode = setTarget(lockedDoors, level, player)
     drawNode(targetNode.getLocation, colour = Purple)

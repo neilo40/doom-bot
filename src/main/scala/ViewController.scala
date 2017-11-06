@@ -29,6 +29,7 @@ object ViewController {
   def changeLevel(name: String): Unit = {
     val level = LEVELS.find(_.name == name)
     showLevel(level.getOrElse(LEVELS.head))
+    BOT_RUNNING = false
     PlayerInterface.changeLevel(name(1), name(3))   // This fails if the game isn't running
   }
 

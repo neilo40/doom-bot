@@ -1,6 +1,6 @@
 import spray.json.{DefaultJsonProtocol, DeserializationException, JsNumber, JsObject, JsString, JsValue, JsonFormat, RootJsonFormat}
 
-case class Player(position: Vertex, angle: Int, id: Int, keyCards: KeyCards)
+case class Player(position: Vertex, angle: Int, id: Int, keyCards: KeyCards, health: Int)
 case class MoveTestResponse(id: Int, x: Int, y: Int, result: Boolean)
 case class Door(id: Int, distance: Double, state: String, keyRequired: String, line: DoorLine)
 case class Object(position: Vertex, typeId: Int, distance: Double, health: Int, id: Int, typeString: String)
@@ -19,9 +19,9 @@ object Protocols extends DefaultJsonProtocol {
     override def write(obj: Player): JsValue = throw new RuntimeException("Writing Player objects Not supported")
 
     override def read(json: JsValue): Player = {
-      json.asJsObject.getFields("position", "angle", "id", "keyCards") match {
-        case Seq(JsObject(position), JsNumber(angle), JsNumber(id), JsObject(keyCards)) =>
-          Player(position.toJson.convertTo[Vertex], angle.toInt, id.toInt, keyCards.toJson.convertTo[KeyCards])
+      json.asJsObject.getFields("position", "angle", "id", "keyCards", "health") match {
+        case Seq(JsObject(position), JsNumber(angle), JsNumber(id), JsObject(keyCards), JsNumber(health)) =>
+          Player(position.toJson.convertTo[Vertex], angle.toInt, id.toInt, keyCards.toJson.convertTo[KeyCards], health.toInt)
         case _ => throw DeserializationException("Couldn't deserialize player")
       }
     }
