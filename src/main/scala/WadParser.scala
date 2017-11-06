@@ -93,7 +93,7 @@ object WadParser {
     vertexData.sliding(4, 4).map(extractVertex).toList
   }
 
-  private def extractLine(bytes: List[Byte], vertices: List[Vertex]): WadLine = {
+  private def extractLine(bytes: List[Byte], vertices: List[Vertex], level: Level): WadLine = {
     val aIndex = ByteBuffer.wrap(bytes.take(2).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
     val bIndex = ByteBuffer.wrap(bytes.slice(2, 4).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
     val flags = ByteBuffer.wrap(bytes.slice(4, 6).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
@@ -102,24 +102,28 @@ object WadParser {
     val leftSide = ByteBuffer.wrap(bytes.slice(10, 12).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
     val rightSide = ByteBuffer.wrap(bytes.slice(12, 14).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
     val oneSided = leftSide == -1 || rightSide == -1 || (flags & 0x0001) == 1
-    WadLine(vertices(aIndex), vertices(bIndex), oneSided, Some(sectorTag), Some(specialType))
+    WadLine(vertices(aIndex), vertices(bIndex), oneSided, Some(sectorTag), Some(specialType),
+      level.sectors.get.get(sectorTag))
   }
 
   private def extractLinesForLevel(level: Level): List[WadLine] = {
     val vertices = extractVerticesForLevel(level)
     val linedefs = level.lumps("LINEDEFS").data
-    linedefs.sliding(14, 14).map(extractLine(_, vertices)).toList
+    linedefs.sliding(14, 14).map(extractLine(_, vertices, level)).toList
   }
 
   private def extractSector(bytes: List[Byte]): Sector = {
+    val floorHeight = ByteBuffer.wrap(bytes.take(2).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
+    val ceilingHeight = ByteBuffer.wrap(bytes.slice(2, 4).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
     val sectorType = ByteBuffer.wrap(bytes.slice(22, 24).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
-    val tag = ByteBuffer.wrap(bytes.slice(24, 26).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
-    Sector(sectorType, tag)
+    val id = ByteBuffer.wrap(bytes.slice(24, 26).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
+    Sector(sectorType, id, floorHeight, ceilingHeight)
   }
 
-  private def extractSectorsForLevel(level: Level): List[Sector] = {
+  private def extractSectorsForLevel(level: Level): Map[Int, Sector] = {
     val sectorBytes = level.lumps("SECTORS").data
-    (sectorBytes.sliding(26, 26) map extractSector).toList
+    val sectorList = (sectorBytes.sliding(26, 26) map extractSector).toList
+    sectorList.map(sector => sector.id -> sector).toMap
   }
 
   private def extractExit(level: Level): Vertex = {
@@ -138,12 +142,13 @@ object WadParser {
   }
 
   private def addMiscDataToLevel(level: Level): Level = {
-    val levelWithLines = level.setLines(extractLinesForLevel(level))
-    levelWithLines.setPlayerStart(extractPlayerStart(level))
+    val levelWithSectors = level.setSectors(extractSectorsForLevel(level))
+    val levelWithLines = levelWithSectors.setLines(extractLinesForLevel(levelWithSectors))
+
+    levelWithLines.setPlayerStart(extractPlayerStart(levelWithLines))
     levelWithLines.setExit(extractExit(levelWithLines))
     levelWithLines.setDoorSwitches(doorLinedefs(levelWithLines))
-    val levelWithSectors = levelWithLines.setSectors(extractSectorsForLevel(level))
-    levelWithSectors
+    levelWithLines
   }
 
   private def extractThing(bytes: List[Byte]): Thing = {

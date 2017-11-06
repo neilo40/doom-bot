@@ -9,7 +9,7 @@ case class Level(name: String,
                  lines: Option[List[WadLine]] = None,
                  var quadTree: Option[LineMXQuadTree] = None,
                  var playerStart: Option[Vertex] = None,
-                 var sectors: Option[List[Sector]] = None,
+                 var sectors: Option[Map[Int, Sector]] = None,
                  var exit: Option[Vertex] = None,
                  var doorSwitches: Option[List[DoorSwitch]] = None){
   def addLump(lump: Lump): Level = {
@@ -24,7 +24,7 @@ case class Level(name: String,
     Level(this.name, this.lumps, Some(lines ::: this.lines.getOrElse(List())), this.quadTree, this.playerStart,
       this.sectors, this.exit, this.doorSwitches)
 
-  def setSectors(sectors: List[Sector]): Level =
+  def setSectors(sectors: Map[Int, Sector]): Level =
     Level(this.name, this.lumps, this.lines, this.quadTree, this.playerStart, Some(sectors), this.exit, this.doorSwitches)
 
   def setPlayerStart(v: Vertex): Unit = this.playerStart = Some(v)
@@ -44,7 +44,8 @@ case class WadLine(a: Vertex,
                    b: Vertex,
                    oneSided: Boolean,
                    sectorTag: Option[Int] = None,
-                   lineType: Option[Int] = None) {
+                   lineType: Option[Int] = None,
+                   sector: Option[Sector] = None) {
   override def toString: String = s"[Line] $a <-> $b, oneSided: $oneSided"
 
   def intersectsWith(that: WadLine): Boolean = {
@@ -90,4 +91,4 @@ case class Vertex(x: Double, y: Double) {
 
 case class Thing(position: Vertex, facing: Int, doomId: Int)
 
-case class Sector(sectorType: Int, tag: Int)
+case class Sector(sectorType: Int, id: Int, floorHeight: Int, ceilingHeight: Int)
