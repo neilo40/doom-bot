@@ -13,6 +13,7 @@ object ViewController {
   val BUTTON_BAR_WIDTH = 200
   var LEVELS: List[Level] = List()
   var BOT_RUNNING = true
+  var SELECTED_TARGET: Option[Vertex] = None
 
   // Callbacks
 
@@ -30,6 +31,7 @@ object ViewController {
     val level = LEVELS.find(_.name == name)
     showLevel(level.getOrElse(LEVELS.head))
     BOT_RUNNING = false
+    SELECTED_TARGET = None
     PlayerInterface.changeLevel(name(1), name(3))   // This fails if the game isn't running
   }
 
@@ -49,8 +51,8 @@ object ViewController {
 
   def paneClicked(x: Double, y: Double): Unit = {
     val wadPoint = screenPointToWadPoint(x, y)
+    val level = LEVELS.find(_.name == DoomViewer.mapComboBox.value.value).get
     if (DoomViewer.showQuadTreeButton.selected.value) {
-      val level = LEVELS.find(_.name == DoomViewer.mapComboBox.value.value).get
       val lines = level.quadTree.get.getLinesForPoint(wadPoint)
       if (lines.nonEmpty) {
         showLevel(level)
@@ -61,6 +63,9 @@ object ViewController {
         }
       }
     } else {
+      SELECTED_TARGET = Some(wadPoint)
+      showLevel(level)
+      drawNode(SELECTED_TARGET.get, Blue)
       println(s"x: ${wadPoint.x}, y: ${wadPoint.y}")
     }
   }

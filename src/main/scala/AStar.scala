@@ -58,11 +58,11 @@ object AStar {
     var currentNode: PathNode = endNode
     var path: List[PathNode] = List(endNode)
     while (cameFrom.contains(currentNode)){
-      if (!noDraw) ViewController.drawNode(currentNode.getLocation, Yellow)
+      if (!noDraw) ViewController.drawNode(currentNode.getLocation, OrangeRed)
       currentNode = cameFrom(currentNode)
       path = currentNode :: path
     }
-    if (!noDraw) ViewController.drawNode(currentNode.getLocation, Yellow)
+    if (!noDraw) ViewController.drawNode(currentNode.getLocation, OrangeRed)
     path
   }
 
@@ -73,8 +73,8 @@ object AStar {
 
   def findPathCallback(level: Level): Unit = {
     val startingNode = getStartingNode(level)
-    val targetNode = new PathNode(level.exit.get, startingNode.getLevel)
+    val targetNode = new PathNode(ViewController.SELECTED_TARGET.getOrElse(level.exit.get), startingNode.getLevel)
     ViewController.drawNode(targetNode.getLocation, Blue)
-    calculatePath(startingNode, targetNode)
+    calculatePath(startingNode, targetNode, drawPathOnly = true)
   }
 }

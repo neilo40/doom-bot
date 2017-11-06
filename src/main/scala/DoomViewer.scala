@@ -13,7 +13,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 object DoomViewer extends JFXApp{
 
   val mapPane: Pane = new Pane{
-    onMouseClicked = (e: MouseEvent) => ViewController.paneClicked(e.x, e.y)
+    onMouseClicked = (e: MouseEvent) => Future {ViewController.paneClicked(e.x, e.y)}
   }
 
   val boundingBoxesButton: ToggleButton = new ToggleButton{
