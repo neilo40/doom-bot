@@ -1,6 +1,7 @@
 import java.io.{File, FileInputStream}
 import java.nio.{ByteBuffer, ByteOrder, MappedByteBuffer}
 import java.nio.channels.FileChannel.MapMode._
+import math.abs
 
 object WadParser {
   val HEADER_SIZE = 12
@@ -101,9 +102,14 @@ object WadParser {
     val sectorTag = ByteBuffer.wrap(bytes.slice(8, 10).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
     val leftSide = ByteBuffer.wrap(bytes.slice(10, 12).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
     val rightSide = ByteBuffer.wrap(bytes.slice(12, 14).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
-    val oneSided = leftSide == -1 || rightSide == -1 || (flags & 0x0001) == 1
+    val leftSideDef = if (leftSide == -1) None else Some(level.sideDefs.get(leftSide))
+    val rightSideDef = if (rightSide == -1) None else Some(level.sideDefs.get(rightSide))
+    val leftHeight = leftSideDef.getOrElse(rightSideDef.get).sector.get.floorHeight
+    val rightHeight = rightSideDef.getOrElse(leftSideDef.get).sector.get.floorHeight
+    val heightDifference = abs(leftHeight - rightHeight)
+    val oneSided = leftSide == -1 || rightSide == -1 || (flags & 0x0001) == 1 || heightDifference > 20 //TODO: rename this to traversible
     WadLine(vertices(aIndex), vertices(bIndex), oneSided, Some(sectorTag), Some(specialType),
-      level.sectors.get.get(sectorTag))
+      rightSideDef, leftSideDef)
   }
 
   private def extractLinesForLevel(level: Level): List[WadLine] = {
@@ -116,14 +122,24 @@ object WadParser {
     val floorHeight = ByteBuffer.wrap(bytes.take(2).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
     val ceilingHeight = ByteBuffer.wrap(bytes.slice(2, 4).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
     val sectorType = ByteBuffer.wrap(bytes.slice(22, 24).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
-    val id = ByteBuffer.wrap(bytes.slice(24, 26).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
-    Sector(sectorType, id, floorHeight, ceilingHeight)
+    val tag = ByteBuffer.wrap(bytes.slice(24, 26).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
+    Sector(sectorType, tag, floorHeight, ceilingHeight)
   }
 
-  private def extractSectorsForLevel(level: Level): Map[Int, Sector] = {
+  private def extractSectorsForLevel(level: Level): List[Sector] = {
     val sectorBytes = level.lumps("SECTORS").data
-    val sectorList = (sectorBytes.sliding(26, 26) map extractSector).toList
-    sectorList.map(sector => sector.id -> sector).toMap
+    (sectorBytes.sliding(26, 26) map extractSector).toList
+  }
+
+  private def extractSideDef(bytes: List[Byte], level: Level): SideDef = {
+    val sectorId = ByteBuffer.wrap(bytes.slice(28, 30).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
+    val sector = level.sectors.get(sectorId)
+    SideDef(sectorId, Some(sector))
+  }
+
+  private def extractSideDefsForLevel(level: Level): List[SideDef] = {
+    val sideDefBytes = level.lumps("SIDEDEFS").data
+    sideDefBytes.sliding(30, 30).map(extractSideDef(_, level)).toList
   }
 
   private def extractExit(level: Level): Vertex = {
@@ -142,8 +158,10 @@ object WadParser {
   }
 
   private def addMiscDataToLevel(level: Level): Level = {
+    //TODO: make this better - only create level once.  Need to do sectors first, then sidedefs, then linedefs
     val levelWithSectors = level.setSectors(extractSectorsForLevel(level))
-    val levelWithLines = levelWithSectors.setLines(extractLinesForLevel(levelWithSectors))
+    val levelWithSideDefs = levelWithSectors.setSideDefs(extractSideDefsForLevel(levelWithSectors))
+    val levelWithLines = levelWithSideDefs.setLines(extractLinesForLevel(levelWithSideDefs))
 
     levelWithLines.setPlayerStart(extractPlayerStart(levelWithLines))
     levelWithLines.setExit(extractExit(levelWithLines))

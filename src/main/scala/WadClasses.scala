@@ -1,4 +1,4 @@
-import scala.math.{pow, sqrt}
+import scala.math.{pow, sqrt, abs}
 
 case class Wad(wadType: String, numLumps: Int, levels: List[Level]) {
   override def toString: String = "[Wad] type: " + wadType + ", lumps: " + numLumps + ", levels: " + levels
@@ -9,23 +9,28 @@ case class Level(name: String,
                  lines: Option[List[WadLine]] = None,
                  var quadTree: Option[LineMXQuadTree] = None,
                  var playerStart: Option[Vertex] = None,
-                 var sectors: Option[Map[Int, Sector]] = None,
+                 var sectors: Option[List[Sector]] = None,
+                 var sideDefs: Option[List[SideDef]] = None,
                  var exit: Option[Vertex] = None,
-                 var doorSwitches: Option[List[DoorSwitch]] = None){
+                 var doorSwitches: Option[List[DoorSwitch]] = None) {
+
   def addLump(lump: Lump): Level = {
     val newLumps: Map[String, Lump] = lumps + (lump.name -> lump)
-    Level(this.name, newLumps, this.lines, this.quadTree, this.playerStart, this.sectors, this.exit, this.doorSwitches)
+    Level(this.name, newLumps, this.lines, this.quadTree, this.playerStart, this.sectors, this.sideDefs, this.exit, this.doorSwitches)
   }
 
   def setLines(lines: List[WadLine]): Level =
-    Level(this.name, this.lumps, Some(lines), this.quadTree, this.playerStart, this.sectors, this.exit, this.doorSwitches)
+    Level(this.name, this.lumps, Some(lines), this.quadTree, this.playerStart, this.sectors, this.sideDefs, this.exit, this.doorSwitches)
 
   def addLines(lines: List[WadLine]): Level =
     Level(this.name, this.lumps, Some(lines ::: this.lines.getOrElse(List())), this.quadTree, this.playerStart,
-      this.sectors, this.exit, this.doorSwitches)
+      this.sectors, this.sideDefs, this.exit, this.doorSwitches)
 
-  def setSectors(sectors: Map[Int, Sector]): Level =
-    Level(this.name, this.lumps, this.lines, this.quadTree, this.playerStart, Some(sectors), this.exit, this.doorSwitches)
+  def setSectors(sectors: List[Sector]): Level =
+    Level(this.name, this.lumps, this.lines, this.quadTree, this.playerStart, Some(sectors), this.sideDefs, this.exit, this.doorSwitches)
+
+  def setSideDefs(sideDefs: List[SideDef]): Level =
+    Level(this.name, this.lumps, this.lines, this.quadTree, this.playerStart, this.sectors, Some(sideDefs), this.exit, this.doorSwitches)
 
   def setPlayerStart(v: Vertex): Unit = this.playerStart = Some(v)
 
@@ -45,7 +50,8 @@ case class WadLine(a: Vertex,
                    oneSided: Boolean,
                    sectorTag: Option[Int] = None,
                    lineType: Option[Int] = None,
-                   sector: Option[Sector] = None) {
+                   rightSideDef: Option[SideDef] = None,
+                   leftSideDef: Option[SideDef] = None) {
   override def toString: String = s"[Line] $a <-> $b, oneSided: $oneSided"
 
   def intersectsWith(that: WadLine): Boolean = {
@@ -57,10 +63,20 @@ case class WadLine(a: Vertex,
     false
   }
 
-  def midpoint: Vertex ={
+  def midpoint: Vertex = {
     val midX = this.a.x + (this.b.x - this.a.x) / 2
     val midY = this.a.y + (this.b.y - this.a.y) / 2
     Vertex(midX, midY)
+  }
+
+  //TODO: get rid of this?  we need to calculate it before we've created the instance
+  def heightDifference: Int = {
+    if (oneSided)  0
+    else {
+      val leftHeight = leftSideDef.get.sector.get.floorHeight
+      val rightHeight = rightSideDef.get.sector.get.floorHeight
+      abs(leftHeight - rightHeight)
+    }
   }
 }
 
@@ -91,4 +107,6 @@ case class Vertex(x: Double, y: Double) {
 
 case class Thing(position: Vertex, facing: Int, doomId: Int)
 
-case class Sector(sectorType: Int, id: Int, floorHeight: Int, ceilingHeight: Int)
+case class Sector(sectorType: Int, tag: Int, floorHeight: Int, ceilingHeight: Int)
+
+case class SideDef(sectorTag: Int, sector: Option[Sector])
