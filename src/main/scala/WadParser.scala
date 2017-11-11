@@ -7,7 +7,10 @@ object WadParser {
   val HEADER_SIZE = 12
   val DOOR_LINEDEF_TYPES = List(1, 117, 63, 114, 29, 111, 90, 105, 4, 108, 31, 118, 61, 115, 103, 112, 86, 106,
     2, 109, 46, 42, 116, 50, 113, 75, 107, 3, 110, 196, 175, 76, 16)
-  val DOOR_SWITCH_TYPES = List(103)
+  val LIFT_LINEDEF_TYPES = List(66, 15, 148, 143, 67, 14, 149, 144, 68, 20, 95, 22, 47, 181, 162, 87, 53, 182,
+    163, 89, 54, 62, 21, 88, 10, 123, 122, 120, 121, 211, 212)
+  val EXIT_TYPES = List(11, 52, 197, 51, 124, 198)
+  val SWITCH_TYPES: List[Int] = List(103) ::: EXIT_TYPES
 
   private def createStream(fromFile: String): MappedByteBuffer = {
     val file = new File(fromFile)
@@ -94,6 +97,10 @@ object WadParser {
     vertexData.sliding(4, 4).map(extractVertex).toList
   }
 
+  private def blocksPlayerAndMonsters(flags: Int): Boolean = (flags & 0x0001) == 1
+
+  private def isLift(specialType: Int): Boolean = LIFT_LINEDEF_TYPES.contains(specialType)
+
   private def extractLine(bytes: List[Byte], vertices: List[Vertex], level: Level): WadLine = {
     val aIndex = ByteBuffer.wrap(bytes.take(2).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
     val bIndex = ByteBuffer.wrap(bytes.slice(2, 4).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
@@ -102,13 +109,19 @@ object WadParser {
     val sectorTag = ByteBuffer.wrap(bytes.slice(8, 10).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
     val leftSide = ByteBuffer.wrap(bytes.slice(10, 12).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
     val rightSide = ByteBuffer.wrap(bytes.slice(12, 14).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
+
     val leftSideDef = if (leftSide == -1) None else Some(level.sideDefs.get(leftSide))
     val rightSideDef = if (rightSide == -1) None else Some(level.sideDefs.get(rightSide))
     val leftHeight = leftSideDef.getOrElse(rightSideDef.get).sector.get.floorHeight
     val rightHeight = rightSideDef.getOrElse(leftSideDef.get).sector.get.floorHeight
     val heightDifference = abs(leftHeight - rightHeight)
-    val oneSided = leftSide == -1 || rightSide == -1 || (flags & 0x0001) == 1 || heightDifference > 20 //TODO: rename this to traversible
-    WadLine(vertices(aIndex), vertices(bIndex), oneSided, Some(sectorTag), Some(specialType),
+    val nonTraversable =
+      leftSide == -1 ||
+      rightSide == -1 ||
+      blocksPlayerAndMonsters(flags) ||
+      (heightDifference > 20 && !isLift(specialType))
+
+    WadLine(vertices(aIndex), vertices(bIndex), nonTraversable, Some(sectorTag), Some(specialType),
       rightSideDef, leftSideDef)
   }
 
@@ -153,7 +166,7 @@ object WadParser {
   }
 
   def doorLinedefs(level: Level): List[DoorSwitch] = {
-    val doorLines = level.lines.getOrElse(List()).filter(line => DOOR_SWITCH_TYPES.contains(line.lineType.getOrElse(-1)))
+    val doorLines = level.lines.getOrElse(List()).filter(line => SWITCH_TYPES.contains(line.lineType.getOrElse(-1)))
     doorLines map DoorSwitch.fromWadLine
   }
 

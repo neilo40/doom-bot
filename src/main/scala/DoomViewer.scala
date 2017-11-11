@@ -51,7 +51,8 @@ object DoomViewer extends JFXApp{
 
   val findPathButton: Button = new Button {
     text = "Find Path"
-    onMouseClicked = (e: MouseEvent) => Future {AStar.findPathCallback(ViewController.getLevel)}
+    onMouseClicked = (e: MouseEvent) => Future {ViewController.findPathCallback(ViewController.getLevel)}
+
   }
 
   val clearButton: Button = new Button {

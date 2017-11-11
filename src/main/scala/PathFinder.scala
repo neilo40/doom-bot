@@ -2,7 +2,7 @@ import scalafx.scene.paint.Color._
 import scala.collection.mutable
 import scala.math.sqrt
 
-object AStar {
+object PathFinder {
 
   def getStartingNode(level: Level): PathNode = {
     def wad = WadParser.createWad()
@@ -19,7 +19,7 @@ object AStar {
   // 1st attempt, taken straight from wikipedia!
   // TODO: make an immutable, functional version
   def calculatePath(startingNode: PathNode, targetNode: PathNode, drawPathOnly: Boolean = false,
-                    noDraw: Boolean = false): List[PathNode] = {
+                    noDraw: Boolean = false): Option[List[PathNode]] = {
     val closedSet = mutable.Set[PathNode]()
     val openSet = mutable.Set(startingNode)
     val cameFrom = mutable.Map[PathNode, PathNode]()
@@ -29,8 +29,8 @@ object AStar {
 
     while (openSet.nonEmpty){
       val currentNode: PathNode = openSet minBy fScore
-      if (currentNode.isCloseEnough(targetNode))
-        return reconstructPath(cameFrom, currentNode, noDraw)
+      if (currentNode.isCloseEnough(targetNode, excludeSwitchWalls = true))
+        return Some(reconstructPath(cameFrom, currentNode, noDraw))
 
       openSet.remove(currentNode)
       closedSet.add(currentNode)
@@ -51,7 +51,7 @@ object AStar {
         }
       }
     }
-    List()
+    None
   }
 
   def reconstructPath(cameFrom: mutable.Map[PathNode, PathNode], endNode: PathNode, noDraw: Boolean): List[PathNode] = {
@@ -66,15 +66,9 @@ object AStar {
     path
   }
 
-  def closestNodeTo(startingNode: PathNode, target: Vertex): Option[PathNode] = {
-    // super inefficient.  better way to do it?
-    calculatePath(startingNode, new PathNode(target, startingNode.getLevel), noDraw = true).lastOption
-  }
-
-  def findPathCallback(level: Level): Unit = {
-    val startingNode = getStartingNode(level)
-    val targetNode = new PathNode(ViewController.SELECTED_TARGET.getOrElse(level.exit.get), startingNode.getLevel)
-    ViewController.drawNode(targetNode.getLocation, Blue)
-    calculatePath(startingNode, targetNode, drawPathOnly = true)
-  }
+  def closestNodeTo(startingNode: PathNode, target: Vertex): Option[PathNode] =
+    calculatePath(startingNode, new PathNode(target, startingNode.getLevel), noDraw = true) match {
+      case Some(l) => l.lastOption
+      case _ => None
+    }
 }

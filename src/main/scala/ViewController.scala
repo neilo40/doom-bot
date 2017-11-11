@@ -2,6 +2,8 @@ import scalafx.scene.paint.Color._
 import scalafx.scene.shape.{Circle, Line, Rectangle}
 import javafx.scene.shape.{Circle => JavaFxCircle, Line => JavaFxLine, Rectangle => JavaFxRectangle}
 
+import PathFinder.{calculatePath, getStartingNode}
+
 import scalafx.application.Platform
 import scalafx.collections.ObservableBuffer
 import scalafx.scene.Node
@@ -57,7 +59,7 @@ object ViewController {
       if (lines.nonEmpty) {
         showLevel(level)
         showQuadTree(level)
-        val screenLines = makeLinesForDisplay(lines, Red)
+        val screenLines = makeLinesForDisplay(lines, colour = Some(Red))
         screenLines.foreach {
           DoomViewer.mapPane.children.add(_)
         }
@@ -73,7 +75,7 @@ object ViewController {
   def generatePath(): Unit = GraphBuilder.genGraphForLevel(getLevel, drawPath = true)
 
   def drawPathLine(line: WadLine): Unit = {
-    val pathLine = makeLinesForDisplay(List(line), otherColour = Green).head
+    val pathLine = makeLinesForDisplay(List(line), colour = Some(Green)).head
     Platform.runLater {
       DoomViewer.mapPane.children.add(pathLine)
     }
@@ -97,18 +99,29 @@ object ViewController {
   def drawWorldObjects(): Unit = {
     //Doors from the game engine
     val doors = PlayerInterface.getAllDoors
-    val doorLines = doors.map(door => WadLine(door.line.v1, door.line.v2, oneSided = false))
-    val screenDoorLines = makeLinesForDisplay(doorLines, otherColour = Red)
+    val doorLines = doors.map(door => WadLine(door.line.v1, door.line.v2, nonTraversable = false))
+    val screenDoorLines = makeLinesForDisplay(doorLines, colour = Some(Red))
     //Platform.runLater {
     //  screenDoorLines.foreach { DoomViewer.mapPane.children.add(_) }
     //}
 
     //Doors from the WAD
     val doorSwitches = WadParser.doorLinedefs(getLevel)
-    val doorLinedefs = doorSwitches.map(switch => WadLine(switch.a, switch.b, oneSided = false))
-    val screenDoorLinedefs = makeLinesForDisplay(doorLinedefs, colour = Magenta, otherColour = Magenta)
+    val doorLinedefs = doorSwitches.map(switch => WadLine(switch.a, switch.b, nonTraversable = false))
+    val screenDoorLinedefs = makeLinesForDisplay(doorLinedefs, colour = Some(HotPink), width = Some(3))
     Platform.runLater {
       screenDoorLinedefs.foreach { DoomViewer.mapPane.children.add(_) }
+    }
+  }
+
+  def findPathCallback(level: Level): Unit = {
+    val startingNode = getStartingNode(level)
+    val targetNode = new PathNode(ViewController.SELECTED_TARGET.getOrElse(level.exit.get), startingNode.getLevel)
+    ViewController.drawNode(targetNode.getLocation, Blue)
+    val path = calculatePath(startingNode, targetNode, drawPathOnly = true)
+    path match {
+      case None => println("No path to target")
+      case _ =>
     }
   }
 
@@ -122,7 +135,11 @@ object ViewController {
     val quadTree = level.quadTree.get
     val lines = fitLinesToScreen(quadTree.getAllBounds)
     val boxes = lines.map(lineToRect(_, Green))
-    boxes.foreach{DoomViewer.mapPane.children.add(_)}
+    Platform.runLater {
+      boxes.foreach {
+        DoomViewer.mapPane.children.add(_)
+      }
+    }
   }
 
   // TODO: use this in line conversion code
@@ -162,14 +179,14 @@ object ViewController {
     val newAY = line.a.y - minY
     val newBX = line.b.x - minX
     val newBY = line.b.y - minY
-    WadLine(Vertex(newAX, newAY), Vertex(newBX, newBY), line.oneSided)
+    WadLine(Vertex(newAX, newAY), Vertex(newBX, newBY), line.nonTraversable)
   }
 
   //Doom origin is SW, screen render origin is NW
   private def flipYAxis(line: WadLine, maxY: Double): WadLine = {
     val newAY = maxY - line.a.y
     val newBY = maxY - line.b.y
-    WadLine(Vertex(line.a.x, newAY), Vertex(line.b.x, newBY), line.oneSided)
+    WadLine(Vertex(line.a.x, newAY), Vertex(line.b.x, newBY), line.nonTraversable)
   }
 
   private def scaleLine(line: WadLine, factor: Double): WadLine = {
@@ -177,7 +194,7 @@ object ViewController {
     val newAY = (line.a.y / factor).toInt
     val newBX = (line.b.x / factor).toInt
     val newBY = (line.b.y / factor).toInt
-    WadLine(Vertex(newAX, newAY), Vertex(newBX, newBY), line.oneSided)
+    WadLine(Vertex(newAX, newAY), Vertex(newBX, newBY), line.nonTraversable)
   }
 
   //TODO: avoid duplicate code
@@ -214,19 +231,20 @@ object ViewController {
     val (minX, minY) = getMinCoords(level.lines.get)
     val (maxX, maxY) = getMaxCoords(level.lines.get)
     val factor = (maxX - minX) / CANVAS_WIDTH
-    (WadLine(Vertex(minX, minY), Vertex(maxX, maxY), oneSided = false), factor)
+    (WadLine(Vertex(minX, minY), Vertex(maxX, maxY), nonTraversable = false), factor)
   }
 
-  private def makeLinesForDisplay(wadLines: List[WadLine], colour: Color = Black,
-                                  otherColour: Color = LightGrey): List[Line] = {
+  private def makeLinesForDisplay(wadLines: List[WadLine], colour: Option[Color] = None,
+                                  width: Option[Double] = None): List[Line] = {
     val fittedLines = fitLinesToScreen(wadLines)
     fittedLines.map(line => {
       val l = new Line(new JavaFxLine(line.a.x, line.a.y, line.b.x, line.b.y))
-      if (line.oneSided) {
-        l.strokeWidth = 2
-        l.stroke = colour
+      if (line.nonTraversable) {
+        l.strokeWidth = width.getOrElse(2.0)
+        l.stroke = colour.getOrElse(Black)
       } else {
-        l.stroke = otherColour
+        l.strokeWidth = width.getOrElse(1.0)
+        l.stroke = colour.getOrElse(Grey)
       }
       l
     })

@@ -10,19 +10,19 @@ class LineMXQuadTree(cellBounds: WadLine,
   //Doom origin is SW
   if (depth < LineMXQuadTree.MAX_DEPTH){
     nw = Some(new LineMXQuadTree(
-      WadLine(Vertex(cellBounds.a.x, (cellBounds.a.y + cellBounds.b.y) / 2), Vertex((cellBounds.a.x + cellBounds.b.x) / 2, cellBounds.b.y), oneSided = false),
+      WadLine(Vertex(cellBounds.a.x, (cellBounds.a.y + cellBounds.b.y) / 2), Vertex((cellBounds.a.x + cellBounds.b.x) / 2, cellBounds.b.y), nonTraversable = false),
       Some(this),
       depth + 1))
     ne = Some(new LineMXQuadTree(
-      WadLine(Vertex((cellBounds.a.x + cellBounds.b.x) / 2, (cellBounds.a.y + cellBounds.b.y) / 2), cellBounds.b, oneSided = false),
+      WadLine(Vertex((cellBounds.a.x + cellBounds.b.x) / 2, (cellBounds.a.y + cellBounds.b.y) / 2), cellBounds.b, nonTraversable = false),
       Some(this),
       depth + 1))
     se = Some(new LineMXQuadTree(
-      WadLine(Vertex((cellBounds.a.x + cellBounds.b.x) / 2, cellBounds.a.y), Vertex(cellBounds.b.x, (cellBounds.a.y + cellBounds.b.y) / 2), oneSided = false),
+      WadLine(Vertex((cellBounds.a.x + cellBounds.b.x) / 2, cellBounds.a.y), Vertex(cellBounds.b.x, (cellBounds.a.y + cellBounds.b.y) / 2), nonTraversable = false),
       Some(this),
       depth + 1))
     sw = Some(new LineMXQuadTree(
-      WadLine(cellBounds.a, Vertex((cellBounds.a.x + cellBounds.b.x) / 2, (cellBounds.a.y + cellBounds.b.y) / 2), oneSided = false),
+      WadLine(cellBounds.a, Vertex((cellBounds.a.x + cellBounds.b.x) / 2, (cellBounds.a.y + cellBounds.b.y) / 2), nonTraversable = false),
       Some(this),
       depth + 1))
   }
@@ -100,12 +100,12 @@ object LineMXQuadTree {
   def createQuadTree(level: Level): LineMXQuadTree = {
     val (maxX, maxY) = ViewController.getMaxCoords(level.lines.get)
     val (minX, minY) = ViewController.getMinCoords(level.lines.get)
-    val levelBounds = WadLine(Vertex(minX - 1, minY - 1), Vertex(maxX + 1, maxY + 1), oneSided = false)
+    val levelBounds = WadLine(Vertex(minX - 1, minY - 1), Vertex(maxX + 1, maxY + 1), nonTraversable = false)
     val quadTree = new LineMXQuadTree(levelBounds)
     val outsideLines = allExternalLines(level)
     outsideLines foreach quadTree.assignLineToNode
     quadTree
   }
 
-  def allExternalLines(level: Level): List[WadLine] = level.lines.get.filter(l => l.oneSided)
+  def allExternalLines(level: Level): List[WadLine] = level.lines.get.filter(l => l.nonTraversable)
 }

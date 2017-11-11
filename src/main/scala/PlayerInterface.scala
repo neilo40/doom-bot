@@ -5,7 +5,7 @@ import math._
 
 object PlayerInterface {
   val baseUrl = "http://localhost:6001/api"
-  val enemyIds = List(3004, 3001)  // 2035=barrel
+  val enemyIds = List(3004, 3001, 9, 3002)  // 2035=barrel
   val threatThreshold = 400
   val doorThreshold = 150
   val keyCardIds = List(5, 6, 13)
@@ -34,6 +34,11 @@ object PlayerInterface {
     val direction = if (amount > 0) "forward" else "backward"
     val abs_amount = abs(amount)
     val jsonData = "{\"type\": \"" + direction + "\", \"amount\": " + abs_amount + "}"
+    post("player/actions", jsonData)
+  }
+
+  def strafeLeft(): Unit = {
+    val jsonData = "{\"type\": \"strafe-left\"}"
     post("player/actions", jsonData)
   }
 

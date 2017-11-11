@@ -47,13 +47,10 @@ class PathNode(location: Vertex,
     val proposedLocation = start + PathNode.translations(direction)
     val proposedNode = new PathNode(proposedLocation, level)
     val existingProposedNode = seenNodes.find(_ == proposedNode)
-    val potentialObstructions = level.quadTree.get.getLinesBetweenTwoPoints(start, proposedLocation)
-    val proposedLine = WadLine(start, proposedLocation, oneSided = false)
-    potentialObstructions foreach {wall =>
-      if (proposedLine.intersectsWith(wall)) return new DeadEnd()
-    }
+    val proposedLine = PathNode.getDirectPath(start, proposedLocation, level)
+    if (proposedLine.isEmpty) return new DeadEnd()
     if (drawPath) {
-      ViewController.drawPathLine(proposedLine)
+      ViewController.drawPathLine(proposedLine.get)
       ViewController.drawNode(proposedLocation)
     }
 
@@ -62,7 +59,11 @@ class PathNode(location: Vertex,
     newNode
   }
 
-  def isCloseEnough(that: PathNode): Boolean = this.getLocation.isCloseTo(that.getLocation, GraphBuilder.STEP_SIZE)
+  def isCloseEnough(that: PathNode, excludeSwitchWalls: Boolean = false): Boolean = {
+    location.isCloseTo(that.getLocation, GraphBuilder.STEP_SIZE) &&
+      PathNode.getDirectPath(location, that.getLocation, level, excludeSwitchWalls).isDefined
+  }
+
   def isCloseEnoughToUse(that: PathNode): Boolean = this.getLocation.isCloseTo(that.getLocation, 100)
 
   override def toString: String = s"PathNode: $location"
@@ -74,6 +75,18 @@ object PathNode {
   "s" -> Vertex(0, -GraphBuilder.STEP_SIZE),
   "e" -> Vertex(GraphBuilder.STEP_SIZE, 0),
   "w" -> Vertex(-GraphBuilder.STEP_SIZE, 0))
+
+  def getDirectPath(start: Vertex, proposedLocation: Vertex, level: Level, excludeSwitchWalls: Boolean = false): Option[WadLine] = {
+    val potentialObstructions = level.quadTree.get.getLinesBetweenTwoPoints(start, proposedLocation)
+    val wallList = if (excludeSwitchWalls)
+      potentialObstructions.filter(line => !WadParser.SWITCH_TYPES.contains(line.lineType.getOrElse(0)))
+    else potentialObstructions
+    val proposedLine = WadLine(start, proposedLocation, nonTraversable = false)
+    wallList foreach {wall =>
+      if (proposedLine.intersectsWith(wall)) return None
+    }
+    Some(proposedLine)
+  }
 }
 
 class DeadEnd extends PathNodeTrait

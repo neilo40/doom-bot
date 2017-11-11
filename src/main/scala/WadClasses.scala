@@ -47,12 +47,13 @@ case class Lump(name: String, data: List[Byte]) {
 
 case class WadLine(a: Vertex,
                    b: Vertex,
-                   oneSided: Boolean,
+                   nonTraversable: Boolean,
                    sectorTag: Option[Int] = None,
                    lineType: Option[Int] = None,
                    rightSideDef: Option[SideDef] = None,
                    leftSideDef: Option[SideDef] = None) {
-  override def toString: String = s"[Line] $a <-> $b, oneSided: $oneSided"
+
+  override def toString: String = s"[Line] $a <-> $b, non-traversable: $nonTraversable"
 
   def intersectsWith(that: WadLine): Boolean = {
     val denom: Double = (that.b.y - that.a.y) * (this.b.x - this.a.x) - (that.b.x - that.a.x) * (this.b.y - this.a.y)
@@ -67,16 +68,6 @@ case class WadLine(a: Vertex,
     val midX = this.a.x + (this.b.x - this.a.x) / 2
     val midY = this.a.y + (this.b.y - this.a.y) / 2
     Vertex(midX, midY)
-  }
-
-  //TODO: get rid of this?  we need to calculate it before we've created the instance
-  def heightDifference: Int = {
-    if (oneSided)  0
-    else {
-      val leftHeight = leftSideDef.get.sector.get.floorHeight
-      val rightHeight = rightSideDef.get.sector.get.floorHeight
-      abs(leftHeight - rightHeight)
-    }
   }
 }
 
