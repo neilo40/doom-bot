@@ -1,3 +1,5 @@
+import java.net.ConnectException
+
 import scalafx.scene.paint.Color._
 import scalafx.scene.shape.{Circle, Line, Rectangle}
 import javafx.scene.shape.{Circle => JavaFxCircle, Line => JavaFxLine, Rectangle => JavaFxRectangle}
@@ -16,11 +18,12 @@ object ViewController {
   var LEVELS: List[Level] = List()
   var BOT_RUNNING = true
   var SELECTED_TARGET: Option[Vertex] = None
+  val DEFAULT_WAD_LOCATION = "/home/neil/Downloads/doom1.wad"
 
   // Callbacks
 
   def loadWad(): Unit = {
-    val wad = WadParser.createWad()
+    val wad = WadParser.createWad(getWadFile)
     LEVELS = wad.levels
     val levelNames = LEVELS.map(_.name)
     Platform.runLater {
@@ -34,7 +37,7 @@ object ViewController {
     showLevel(level.getOrElse(LEVELS.head))
     BOT_RUNNING = false
     SELECTED_TARGET = None
-    PlayerInterface.changeLevel(name(1), name(3))   // This fails if the game isn't running
+    GameInterface.changeLevel(name(1), name(3))   // This fails if the game isn't running
   }
 
   def boundingBoxToggle(showBoxes: Boolean): Unit = {
@@ -98,7 +101,7 @@ object ViewController {
 
   def drawWorldObjects(): Unit = {
     //Doors from the game engine
-    val doors = PlayerInterface.getAllDoors
+    val doors = GameInterface.getAllDoors
     val doorLines = doors.map(door => Linedef(door.line.v1, door.line.v2, nonTraversable = false))
     val screenDoorLines = makeLinesForDisplay(doorLines, colour = Some(Red))
     //Platform.runLater {
@@ -118,14 +121,23 @@ object ViewController {
     val startingNode = getStartingNode(level)
     val targetNode = new PathNode(ViewController.SELECTED_TARGET.getOrElse(level.exit), startingNode.getLevel)
     ViewController.drawNode(targetNode.getLocation, Blue)
-    val path = calculatePath(startingNode, targetNode, drawPathOnly = true)
+    val path = calculatePath(startingNode, targetNode, List(), drawPathOnly = true)
     path match {
       case None => println("No path to target")
       case _ =>
     }
   }
 
+
   // Private methods
+
+  def getWadFile: String = {
+    try {
+      GameInterface.getWorldSettings.wad
+    } catch {
+      case e: ConnectException => DEFAULT_WAD_LOCATION
+    }
+  }
 
   def getLevel: Level = {
     LEVELS.find(_.name == DoomViewer.mapComboBox.value.value).get

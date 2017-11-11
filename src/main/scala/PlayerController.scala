@@ -3,71 +3,85 @@ import math._
 import scalafx.scene.paint.Color._
 
 object PlayerController {
-  val BARREL_SIZE = 40
+  val BARREL_SIZE = 60
+  val BARREL_SIZE_FOR_TARGETING = 30
   val LOOK_AHEAD = 6 // How far in the path to look ahead
   var DOOR_SWITCH_TARGET: Option[DoorSwitch] = None
   val DOOR_SWITCH_RANGE = 200
-  //var BARREL_KILLER = false  // whether we should be killing barrels or avoiding them
+  val STUCK_THRESHOLD = 10  // while moving, distance we need to have travelled else stuck
 
   def startBot(): Unit = {
     val level = ViewController.LEVELS.find(_.name == DoomViewer.mapComboBox.value.value).get
-    val barrelLines = PlayerInterface.getAllBarrels flatMap barrelToLines
-    val levelWithBarrels = level.addLines(barrelLines)
+    val gameBarrels = GameInterface.getAllBarrels
+    val barrels: Map[String, List[Linedef]] = Map(
+      "pathing" -> gameBarrels.flatMap(barrelToLines(_, BARREL_SIZE)),
+      "targeting" -> gameBarrels.flatMap(barrelToLines(_, BARREL_SIZE_FOR_TARGETING)))
+    val levelWithBarrels = level.addLines(barrels("pathing"))
     ViewController.showLevel(levelWithBarrels)
     val startingNode = GraphBuilder.genGraphForLevel(levelWithBarrels)
     var currentNode = startingNode
-    val keys = PlayerInterface.getAllKeys
+    val keys = GameInterface.getAllKeys
 
-    while (ViewController.BOT_RUNNING) currentNode = iterateBot(currentNode, level, keys)
+    while (ViewController.BOT_RUNNING) currentNode = iterateBot(currentNode, level, keys, barrels)
   }
 
   // Convert a barrel to a bounding box of one-sided lines
-  def barrelToLines(barrel: Object): List[Linedef] = {
+  // They are traversable but will incur a large penalty when calculating the path
+  def barrelToLines(barrel: Object, size: Int): List[Linedef] = {
     val x = barrel.position.x
     val y = barrel.position.y
     List(
-      Linedef(Vertex(x - BARREL_SIZE, y - BARREL_SIZE), Vertex(x + BARREL_SIZE, y - BARREL_SIZE), nonTraversable = true),
-      Linedef(Vertex(x + BARREL_SIZE, y - BARREL_SIZE), Vertex(x + BARREL_SIZE, y + BARREL_SIZE), nonTraversable = true),
-      Linedef(Vertex(x + BARREL_SIZE, y + BARREL_SIZE), Vertex(x - BARREL_SIZE, y + BARREL_SIZE), nonTraversable = true),
-      Linedef(Vertex(x - BARREL_SIZE, y + BARREL_SIZE), Vertex(x - BARREL_SIZE, y - BARREL_SIZE), nonTraversable = true)
+      Linedef(Vertex(x - size, y - size), Vertex(x + size, y - size), nonTraversable = false),
+      Linedef(Vertex(x + size, y - size), Vertex(x + size, y + size), nonTraversable = false),
+      Linedef(Vertex(x + size, y + size), Vertex(x - size, y + size), nonTraversable = false),
+      Linedef(Vertex(x - size, y + size), Vertex(x - size, y - size), nonTraversable = false)
     )
   }
 
   // This is the main player loop
-  def iterateBot(currentNode: PathNode, level: Level, keys: List[Object]): PathNode = {
-    val player = PlayerInterface.getPlayer
+  def iterateBot(currentNode: PathNode, level: Level, keys: List[Object], barrels: Map[String, List[Linedef]]): PathNode = {
+    val player = GameInterface.getPlayer
     if (player.health <= 0) ViewController.BOT_RUNNING = false
-    val lockedDoors = PlayerInterface.lockedDoors(player)
+    val lockedDoors = GameInterface.lockedDoors(player)
     val targetNode = setTarget(lockedDoors, level, player)
     drawNode(targetNode.getLocation, colour = Purple)
     val playerNode = PathFinder.closestNodeTo(currentNode, player.position).getOrElse(currentNode)
     if (playerNode.isCloseEnoughToUse(targetNode) &&
       PathNode.getDirectPath(player.position, targetNode.getLocation, level, excludeSwitchWalls = true).isDefined) {
-      // we should stop the bot running here if target node was the exit
+      // TODO: we should stop the bot running here if target node was the exit
       DOOR_SWITCH_TARGET match {
         case Some(x) => x.switched = true
         case _ =>
       }
-      PlayerInterface.use()
+      GameInterface.use()
     }
-    if (PlayerInterface.isNearClosedDoor(player)) PlayerInterface.use()
-    val worldObjects = PlayerInterface.getObjects()
-    val threat = PlayerInterface.nearbyThreat(player, worldObjects)
-    threat match {
-      case Some(t) =>
-        turnTowards(player.position, t.position)
-        PlayerInterface.shoot()
-      case _ =>
-        unStuck(player.position, currentNode.getLocation)
-        val path = PathFinder.calculatePath(playerNode, targetNode, noDraw = true)
-        val (nextNode, speed) = getNextNode(path, player, level)
-        headTowards(player.position, nextNode, speed)
+    if (GameInterface.isNearClosedDoor(player)) GameInterface.use()
+    val worldObjects = GameInterface.getObjects()
+    val threat = GameInterface.nearbyThreat(player, worldObjects)
+    if (threat.isDefined && !aboutToShootBarrel(player, threat.get, barrels("targeting"))) {
+      turnTowards(player.position, threat.get.position)
+      GameInterface.shoot()
+    } else {
+      unStuck(player.position, currentNode.getLocation)
+      val path = PathFinder.calculatePath(playerNode, targetNode, barrels("pathing"), noDraw = true)
+      val (nextNode, speed) = getNextNode(path, player, level)
+      headTowards(player.position, nextNode, speed)
     }
     drawScene(level, player)
     playerNode
   }
 
-  def unStuck(position: Vertex, lastPosition: Vertex): Unit = if (position == lastPosition) PlayerInterface.strafeLeft()
+  // If barrel is between player and target, don't engage!
+  def aboutToShootBarrel(player: Player, enemy: Object, barrels: List[Linedef]): Boolean = {
+    val lineOfSight = Linedef(player.position, enemy.position, nonTraversable = false)
+    barrels foreach { barrel => if (lineOfSight.intersectsWith(barrel)) return true }
+    false
+  }
+
+  def unStuck(position: Vertex, lastPosition: Vertex): Unit = {
+    val distanceTraveled = lastPosition.distanceTo(position)
+    if (distanceTraveled < STUCK_THRESHOLD) GameInterface.strafeLeft()
+  }
 
   def setTarget(lockedDoors: List[Door], level: Level, player: Player): PathNode = {
     val doorSwitch = doorSwitchInRange(level, player)
@@ -75,7 +89,7 @@ object PlayerController {
       DOOR_SWITCH_TARGET = doorSwitch
       new PathNode(doorSwitch.get.midpoint, level)
     } else if (lockedDoors.nonEmpty){
-      val key = PlayerInterface.getKey(lockedDoors.head.keyRequired)
+      val key = GameInterface.getKey(lockedDoors.head.keyRequired)
       key match {
         case Some(k) => new PathNode(k.position, level)
         case _ => new PathNode(level.exit, level)
@@ -101,7 +115,7 @@ object PlayerController {
     path match {
       case Some(p) =>
         p.slice(1, LOOK_AHEAD).reverse.foreach { node =>
-          if (PlayerInterface.canMoveTo(player, node.getLocation))
+          if (GameInterface.canMoveTo(player, node.getLocation))
             return (node, speed)
           else
             speed -= 1
@@ -117,13 +131,13 @@ object PlayerController {
     val targetAngle = toDegrees(atan2(targetPosition.x - currentPosition.x,
       currentPosition.y - targetPosition.y)) - 90
     val normalisedAngle = if (targetAngle < 0) targetAngle + 360 else targetAngle
-    PlayerInterface.turn(normalisedAngle.toInt)
+    GameInterface.turn(normalisedAngle.toInt)
   }
 
   def headTowards(currentPosition: Vertex, nextNode: PathNode, speed: Int): Unit = {
     drawNode(nextNode.getLocation, Green)
     turnTowards(currentPosition, nextNode.getLocation)
-    PlayerInterface.move(speed)
+    GameInterface.move(speed)
   }
 
   private def drawScene(level: Level, player: Player): Unit = {

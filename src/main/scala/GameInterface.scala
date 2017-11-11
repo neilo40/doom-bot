@@ -3,7 +3,7 @@ import spray.json._
 import Protocols._
 import math._
 
-object PlayerInterface {
+object GameInterface {
   val baseUrl = "http://localhost:6001/api"
   val enemyIds = List(3004, 3001, 9, 3002)  // 2035=barrel
   val threatThreshold = 400
@@ -23,6 +23,8 @@ object PlayerInterface {
     val jsonData = "{\"episode\": " + episode + ", \"map\": " + map + "}"
     patch("world", jsonData)
   }
+
+  def getWorldSettings: World = get("world").body.parseJson.convertTo[World]
 
   def getPlayer: Player = {
     val playerJsonString = get("player").body

@@ -12,6 +12,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 object DoomViewer extends JFXApp{
 
+  var wadFile: String = ViewController.getWadFile
+
   val mapPane: Pane = new Pane{
     onMouseClicked = (e: MouseEvent) => Future {ViewController.paneClicked(e.x, e.y)}
   }

@@ -1,4 +1,4 @@
-import spray.json.{DefaultJsonProtocol, DeserializationException, JsNumber, JsObject, JsString, JsValue, JsonFormat, RootJsonFormat}
+import spray.json._
 
 case class Player(position: Vertex, angle: Int, id: Int, keyCards: KeyCards, health: Int)
 case class MoveTestResponse(id: Int, x: Int, y: Int, result: Boolean)
@@ -7,6 +7,7 @@ case class Object(position: Vertex, typeId: Int, distance: Double, health: Int, 
 case class LosResponse(los: Boolean, id: Int, id2: Int)
 case class KeyCards(blue: Boolean, red: Boolean, yellow: Boolean)
 case class DoorLine(v1: Vertex, v2: Vertex)
+case class World(map: Int, episode: Int, lights: String, skill: String, wad: String)
 
 object Protocols extends DefaultJsonProtocol {
   implicit val vertexFormat: JsonFormat[Vertex] = lazyFormat(jsonFormat(Vertex, "x", "y"))
@@ -14,6 +15,7 @@ object Protocols extends DefaultJsonProtocol {
   implicit val MoveTestResponseFormat: JsonFormat[MoveTestResponse] = jsonFormat4(MoveTestResponse)
   implicit val LosResponseFormat: JsonFormat[LosResponse] = jsonFormat3(LosResponse)
   implicit val KeyCardsFormat: JsonFormat[KeyCards] = jsonFormat3(KeyCards)
+  implicit val WorldFormat: JsonFormat[World] = jsonFormat5(World)
 
   implicit object PlayerJsonFormat extends RootJsonFormat[Player] {
     override def write(obj: Player): JsValue = throw new RuntimeException("Writing Player objects Not supported")

@@ -4,7 +4,6 @@ import java.nio.channels.FileChannel.MapMode._
 import math.abs
 
 object WadParser {
-  val WAD_LOCATION = "/home/neil/Downloads/doom1.wad"
   val HEADER_SIZE = 12
   val DOOR_LINEDEF_TYPES = List(1, 117, 63, 114, 29, 111, 90, 105, 4, 108, 31, 118, 61, 115, 103, 112, 86, 106,
     2, 109, 46, 42, 116, 50, 113, 75, 107, 3, 110, 196, 175, 76, 16)
@@ -181,7 +180,7 @@ object WadParser {
     doorLines map DoorSwitch.fromWadLine
   }
 
-  def createWad(fromFile: String = WAD_LOCATION): Wad = {
+  def createWad(fromFile: String): Wad = {
     val byteStream = createStream(fromFile)
     val wadType = extractWadType(byteStream)
     val numLumps = extractNumLumps(byteStream)  // Although we don't use this, we still have to pop it off the byteStream

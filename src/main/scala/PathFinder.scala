@@ -1,30 +1,28 @@
 import scalafx.scene.paint.Color._
 import scala.collection.mutable
-import scala.math.sqrt
 
 object PathFinder {
+  val BARREL_PENALTY = 500
 
-  def getStartingNode(level: Level): PathNode = {
-    def wad = WadParser.createWad()
-    GraphBuilder.genGraphForLevel(level)
-  }
+  def getStartingNode(level: Level): PathNode = GraphBuilder.genGraphForLevel(level)
 
   // Simple straight line from node to target
-  def heuristicCostEstimate(from: PathNode, to: PathNode): Double = {
-    val height = to.getLocation.y - from.getLocation.y
-    val width  = to.getLocation.x - from.getLocation.x
-    sqrt((height * height) + (width * width))
+  def heuristicCostEstimate(from: PathNode, to: PathNode, barrels: List[Linedef]): Double = {
+    val score = from.getLocation.distanceTo(to.getLocation)
+    val pathLine = Linedef(from.getLocation, to.getLocation, nonTraversable = false)
+    barrels foreach { barrel => if (pathLine.intersectsWith(barrel)) return score + BARREL_PENALTY }
+    score
   }
 
   // 1st attempt, taken straight from wikipedia!
   // TODO: make an immutable, functional version
-  def calculatePath(startingNode: PathNode, targetNode: PathNode, drawPathOnly: Boolean = false,
+  def calculatePath(startingNode: PathNode, targetNode: PathNode, barrels: List[Linedef], drawPathOnly: Boolean = false,
                     noDraw: Boolean = false): Option[List[PathNode]] = {
     val closedSet = mutable.Set[PathNode]()
     val openSet = mutable.Set(startingNode)
     val cameFrom = mutable.Map[PathNode, PathNode]()
     val gScore = mutable.Map(startingNode -> 0.0).withDefaultValue(Double.PositiveInfinity)
-    val fScore = mutable.Map(startingNode -> heuristicCostEstimate(startingNode, targetNode))
+    val fScore = mutable.Map(startingNode -> heuristicCostEstimate(startingNode, targetNode, barrels))
       .withDefaultValue(Double.PositiveInfinity)
 
     while (openSet.nonEmpty){
@@ -42,11 +40,11 @@ object PathFinder {
             openSet.add(neighbour)
             if (!drawPathOnly && !noDraw) ViewController.drawNode(neighbour.getLocation, White)
           }
-          val tentativeGScore = gScore(currentNode) + heuristicCostEstimate(currentNode, neighbour)
+          val tentativeGScore = gScore(currentNode) + heuristicCostEstimate(currentNode, neighbour, barrels)
           if (tentativeGScore < gScore(neighbour)){
             cameFrom += (neighbour -> currentNode)
             gScore(neighbour) = tentativeGScore
-            fScore(neighbour) = gScore(neighbour) + heuristicCostEstimate(neighbour, targetNode)
+            fScore(neighbour) = gScore(neighbour) + heuristicCostEstimate(neighbour, targetNode, barrels)
           }
         }
       }
@@ -67,7 +65,7 @@ object PathFinder {
   }
 
   def closestNodeTo(startingNode: PathNode, target: Vertex): Option[PathNode] =
-    calculatePath(startingNode, new PathNode(target, startingNode.getLevel), noDraw = true) match {
+    calculatePath(startingNode, new PathNode(target, startingNode.getLevel), List(), noDraw = true) match {
       case Some(l) => l.lastOption
       case _ => None
     }

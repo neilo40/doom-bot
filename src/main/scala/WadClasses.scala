@@ -75,6 +75,12 @@ case class Vertex(x: Double, y: Double) {
     val distance = sqrt(pow(that.y - this.y, 2) + pow(that.x - this.x, 2))
     distance < range
   }
+
+  def distanceTo(that: Vertex): Double = {
+    val height = that.y - this.y
+    val width  = that.x - this.x
+    sqrt((height * height) + (width * width))
+  }
 }
 
 case class Thing(position: Vertex, facing: Int, doomId: Int)
