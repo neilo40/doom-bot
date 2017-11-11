@@ -39,7 +39,7 @@ object ViewController {
 
   def boundingBoxToggle(showBoxes: Boolean): Unit = {
     if (showBoxes){
-      val lines = fitLinesToScreen(LineMXQuadTree.allExternalLines(getLevel))
+      val lines = fitLinesToScreen(LineMXQuadTree.allExternalLines(getLevel.linedefs))
       val boxes = lines.map(lineToRect(_, Red))
       boxes.foreach{DoomViewer.mapPane.children.add(_)}
     } else {
@@ -55,7 +55,7 @@ object ViewController {
     val wadPoint = screenPointToWadPoint(x, y)
     val level = LEVELS.find(_.name == DoomViewer.mapComboBox.value.value).get
     if (DoomViewer.showQuadTreeButton.selected.value) {
-      val lines = level.quadTree.get.getLinesForPoint(wadPoint)
+      val lines = level.quadTree.getLinesForPoint(wadPoint)
       if (lines.nonEmpty) {
         showLevel(level)
         showQuadTree(level)
@@ -74,7 +74,7 @@ object ViewController {
 
   def generatePath(): Unit = GraphBuilder.genGraphForLevel(getLevel, drawPath = true)
 
-  def drawPathLine(line: WadLine): Unit = {
+  def drawPathLine(line: Linedef): Unit = {
     val pathLine = makeLinesForDisplay(List(line), colour = Some(Green)).head
     Platform.runLater {
       DoomViewer.mapPane.children.add(pathLine)
@@ -99,15 +99,15 @@ object ViewController {
   def drawWorldObjects(): Unit = {
     //Doors from the game engine
     val doors = PlayerInterface.getAllDoors
-    val doorLines = doors.map(door => WadLine(door.line.v1, door.line.v2, nonTraversable = false))
+    val doorLines = doors.map(door => Linedef(door.line.v1, door.line.v2, nonTraversable = false))
     val screenDoorLines = makeLinesForDisplay(doorLines, colour = Some(Red))
     //Platform.runLater {
     //  screenDoorLines.foreach { DoomViewer.mapPane.children.add(_) }
     //}
 
     //Doors from the WAD
-    val doorSwitches = WadParser.doorLinedefs(getLevel)
-    val doorLinedefs = doorSwitches.map(switch => WadLine(switch.a, switch.b, nonTraversable = false))
+    val doorSwitches = getLevel.doorSwitches
+    val doorLinedefs = doorSwitches.map(switch => Linedef(switch.a, switch.b, nonTraversable = false))
     val screenDoorLinedefs = makeLinesForDisplay(doorLinedefs, colour = Some(HotPink), width = Some(3))
     Platform.runLater {
       screenDoorLinedefs.foreach { DoomViewer.mapPane.children.add(_) }
@@ -116,7 +116,7 @@ object ViewController {
 
   def findPathCallback(level: Level): Unit = {
     val startingNode = getStartingNode(level)
-    val targetNode = new PathNode(ViewController.SELECTED_TARGET.getOrElse(level.exit.get), startingNode.getLevel)
+    val targetNode = new PathNode(ViewController.SELECTED_TARGET.getOrElse(level.exit), startingNode.getLevel)
     ViewController.drawNode(targetNode.getLocation, Blue)
     val path = calculatePath(startingNode, targetNode, drawPathOnly = true)
     path match {
@@ -132,7 +132,7 @@ object ViewController {
   }
 
   private def showQuadTree(level: Level): Unit = {
-    val quadTree = level.quadTree.get
+    val quadTree = level.quadTree
     val lines = fitLinesToScreen(quadTree.getAllBounds)
     val boxes = lines.map(lineToRect(_, Green))
     Platform.runLater {
@@ -153,15 +153,15 @@ object ViewController {
   private def screenPointToWadPoint(x: Double, y: Double): Vertex = {
     //TODO: use getLevelBounds()
     val level = LEVELS.find(_.name == DoomViewer.mapComboBox.value.value).get
-    val (minX, minY) = getMinCoords(level.lines.get)
-    val (maxX, maxY) = getMaxCoords(level.lines.get)
+    val (minX, minY) = getMinCoords(level.linedefs)
+    val (maxX, maxY) = getMaxCoords(level.linedefs)
     val factor = (maxX - minX) / CANVAS_WIDTH
     val scaledPoint = Vertex((x * factor).toInt, (y * factor).toInt)
     val flippedPoint = Vertex(scaledPoint.x, (maxY - minY) - scaledPoint.y)
     Vertex(flippedPoint.x + minX, flippedPoint.y + minY)
   }
 
-  private def lineToRect(line: WadLine, colour: Color): Node = {
+  private def lineToRect(line: Linedef, colour: Color): Node = {
     val xCoords = List(line.a.x, line.b.x).sorted
     val yCoords = List(line.a.y, line.b.y).sorted
     val rect = new Rectangle(new JavaFxRectangle(
@@ -174,31 +174,31 @@ object ViewController {
     rect
   }
 
-  private def shiftLine(line: WadLine, minX: Double, minY: Double): WadLine = {
+  private def shiftLine(line: Linedef, minX: Double, minY: Double): Linedef = {
     val newAX = line.a.x - minX
     val newAY = line.a.y - minY
     val newBX = line.b.x - minX
     val newBY = line.b.y - minY
-    WadLine(Vertex(newAX, newAY), Vertex(newBX, newBY), line.nonTraversable)
+    Linedef(Vertex(newAX, newAY), Vertex(newBX, newBY), line.nonTraversable)
   }
 
   //Doom origin is SW, screen render origin is NW
-  private def flipYAxis(line: WadLine, maxY: Double): WadLine = {
+  private def flipYAxis(line: Linedef, maxY: Double): Linedef = {
     val newAY = maxY - line.a.y
     val newBY = maxY - line.b.y
-    WadLine(Vertex(line.a.x, newAY), Vertex(line.b.x, newBY), line.nonTraversable)
+    Linedef(Vertex(line.a.x, newAY), Vertex(line.b.x, newBY), line.nonTraversable)
   }
 
-  private def scaleLine(line: WadLine, factor: Double): WadLine = {
+  private def scaleLine(line: Linedef, factor: Double): Linedef = {
     val newAX = (line.a.x / factor).toInt
     val newAY = (line.a.y / factor).toInt
     val newBX = (line.b.x / factor).toInt
     val newBY = (line.b.y / factor).toInt
-    WadLine(Vertex(newAX, newAY), Vertex(newBX, newBY), line.nonTraversable)
+    Linedef(Vertex(newAX, newAY), Vertex(newBX, newBY), line.nonTraversable)
   }
 
   //TODO: avoid duplicate code
-  def getMaxCoords(lines: List[WadLine]): (Double, Double) = {
+  def getMaxCoords(lines: List[Linedef]): (Double, Double) = {
     val maxStartX = lines.map(_.a.x).max
     val maxEndX = lines.map(_.b.x).max
     val maxStartY = lines.map(_.a.y).max
@@ -208,7 +208,7 @@ object ViewController {
     (maxX, maxY)
   }
 
-  def getMinCoords(lines: List[WadLine]): (Double, Double) = {
+  def getMinCoords(lines: List[Linedef]): (Double, Double) = {
     val minStartX = lines.map(_.a.x).min
     val minEndX = lines.map(_.b.x).min
     val minStartY = lines.map(_.a.y).min
@@ -219,22 +219,22 @@ object ViewController {
   }
 
   //TODO: support portrait orientation levels
-  private def fitLinesToScreen(lines: List[WadLine]): List[WadLine] = {
+  private def fitLinesToScreen(lines: List[Linedef]): List[Linedef] = {
     val (levelBounds, scalingFactor) = getLevelBounds
     lines.map(shiftLine(_, levelBounds.a.x, levelBounds.a.y))
       .map(flipYAxis(_, levelBounds.b.y - levelBounds.a.y))
       .map(scaleLine(_, scalingFactor))
   }
 
-  private def getLevelBounds: (WadLine, Double) = {
+  private def getLevelBounds: (Linedef, Double) = {
     val level = LEVELS.find(_.name == DoomViewer.mapComboBox.value.value).get
-    val (minX, minY) = getMinCoords(level.lines.get)
-    val (maxX, maxY) = getMaxCoords(level.lines.get)
+    val (minX, minY) = getMinCoords(level.linedefs)
+    val (maxX, maxY) = getMaxCoords(level.linedefs)
     val factor = (maxX - minX) / CANVAS_WIDTH
-    (WadLine(Vertex(minX, minY), Vertex(maxX, maxY), nonTraversable = false), factor)
+    (Linedef(Vertex(minX, minY), Vertex(maxX, maxY), nonTraversable = false), factor)
   }
 
-  private def makeLinesForDisplay(wadLines: List[WadLine], colour: Option[Color] = None,
+  private def makeLinesForDisplay(wadLines: List[Linedef], colour: Option[Color] = None,
                                   width: Option[Double] = None): List[Line] = {
     val fittedLines = fitLinesToScreen(wadLines)
     fittedLines.map(line => {
@@ -253,7 +253,7 @@ object ViewController {
   def showLevel(level: Level): Unit = {
     Platform.runLater {
       DoomViewer.stage.title = s"Doom Viewer - ${level.name}"
-      DoomViewer.mapPane.children = makeLinesForDisplay(level.lines.get)
+      DoomViewer.mapPane.children = makeLinesForDisplay(level.linedefs)
     }
   }
 }

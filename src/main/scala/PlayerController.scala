@@ -13,7 +13,6 @@ object PlayerController {
     val level = ViewController.LEVELS.find(_.name == DoomViewer.mapComboBox.value.value).get
     val barrelLines = PlayerInterface.getAllBarrels flatMap barrelToLines
     val levelWithBarrels = level.addLines(barrelLines)
-    levelWithBarrels.quadTree = Some(LineMXQuadTree.createQuadTree(levelWithBarrels))
     ViewController.showLevel(levelWithBarrels)
     val startingNode = GraphBuilder.genGraphForLevel(levelWithBarrels)
     var currentNode = startingNode
@@ -23,14 +22,14 @@ object PlayerController {
   }
 
   // Convert a barrel to a bounding box of one-sided lines
-  def barrelToLines(barrel: Object): List[WadLine] = {
+  def barrelToLines(barrel: Object): List[Linedef] = {
     val x = barrel.position.x
     val y = barrel.position.y
     List(
-      WadLine(Vertex(x - BARREL_SIZE, y - BARREL_SIZE), Vertex(x + BARREL_SIZE, y - BARREL_SIZE), nonTraversable = true),
-      WadLine(Vertex(x + BARREL_SIZE, y - BARREL_SIZE), Vertex(x + BARREL_SIZE, y + BARREL_SIZE), nonTraversable = true),
-      WadLine(Vertex(x + BARREL_SIZE, y + BARREL_SIZE), Vertex(x - BARREL_SIZE, y + BARREL_SIZE), nonTraversable = true),
-      WadLine(Vertex(x - BARREL_SIZE, y + BARREL_SIZE), Vertex(x - BARREL_SIZE, y - BARREL_SIZE), nonTraversable = true)
+      Linedef(Vertex(x - BARREL_SIZE, y - BARREL_SIZE), Vertex(x + BARREL_SIZE, y - BARREL_SIZE), nonTraversable = true),
+      Linedef(Vertex(x + BARREL_SIZE, y - BARREL_SIZE), Vertex(x + BARREL_SIZE, y + BARREL_SIZE), nonTraversable = true),
+      Linedef(Vertex(x + BARREL_SIZE, y + BARREL_SIZE), Vertex(x - BARREL_SIZE, y + BARREL_SIZE), nonTraversable = true),
+      Linedef(Vertex(x - BARREL_SIZE, y + BARREL_SIZE), Vertex(x - BARREL_SIZE, y - BARREL_SIZE), nonTraversable = true)
     )
   }
 
@@ -79,15 +78,15 @@ object PlayerController {
       val key = PlayerInterface.getKey(lockedDoors.head.keyRequired)
       key match {
         case Some(k) => new PathNode(k.position, level)
-        case _ => new PathNode(level.exit.get, level)
+        case _ => new PathNode(level.exit, level)
       }
     } else {
-      new PathNode(level.exit.get, level)
+      new PathNode(level.exit, level)
     }
   }
 
   def doorSwitchInRange(level: Level, player: Player): Option[DoorSwitch] = {
-    val doorSwitches = level.doorSwitches.getOrElse(List())
+    val doorSwitches = level.doorSwitches
     if (doorSwitches.nonEmpty){
       doorSwitches.filter(!_.switched).foreach { doorSwitch =>
         if (doorSwitch.midpoint.isCloseTo(player.position, DOOR_SWITCH_RANGE)) return Some(doorSwitch)

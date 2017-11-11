@@ -76,12 +76,12 @@ object PathNode {
   "e" -> Vertex(GraphBuilder.STEP_SIZE, 0),
   "w" -> Vertex(-GraphBuilder.STEP_SIZE, 0))
 
-  def getDirectPath(start: Vertex, proposedLocation: Vertex, level: Level, excludeSwitchWalls: Boolean = false): Option[WadLine] = {
-    val potentialObstructions = level.quadTree.get.getLinesBetweenTwoPoints(start, proposedLocation)
+  def getDirectPath(start: Vertex, proposedLocation: Vertex, level: Level, excludeSwitchWalls: Boolean = false): Option[Linedef] = {
+    val potentialObstructions = level.quadTree.getLinesBetweenTwoPoints(start, proposedLocation)
     val wallList = if (excludeSwitchWalls)
       potentialObstructions.filter(line => !WadParser.SWITCH_TYPES.contains(line.lineType.getOrElse(0)))
     else potentialObstructions
-    val proposedLine = WadLine(start, proposedLocation, nonTraversable = false)
+    val proposedLine = Linedef(start, proposedLocation, nonTraversable = false)
     wallList foreach {wall =>
       if (proposedLine.intersectsWith(wall)) return None
     }
@@ -97,10 +97,10 @@ object GraphBuilder {
   val MAX_ITERATIONS = 180
 
   def genGraphForLevel(level: Level, drawPath: Boolean = false): PathNode = {
-    val startingPos = new PathNode(level.playerStart.get, level)
+    val startingPos = new PathNode(level.start, level)
     if (drawPath) {
       ViewController.drawNode(startingPos.getLocation, Blue)
-      ViewController.drawNode(level.exit.get, Blue)
+      ViewController.drawNode(level.exit, Blue)
     }
     var newNodes: List[PathNode] = List(startingPos)
     var seenNodes: List[PathNode] = List()

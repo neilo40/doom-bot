@@ -4,13 +4,15 @@ import java.nio.channels.FileChannel.MapMode._
 import math.abs
 
 object WadParser {
+  val WAD_LOCATION = "/home/neil/Downloads/doom1.wad"
   val HEADER_SIZE = 12
   val DOOR_LINEDEF_TYPES = List(1, 117, 63, 114, 29, 111, 90, 105, 4, 108, 31, 118, 61, 115, 103, 112, 86, 106,
     2, 109, 46, 42, 116, 50, 113, 75, 107, 3, 110, 196, 175, 76, 16)
   val LIFT_LINEDEF_TYPES = List(66, 15, 148, 143, 67, 14, 149, 144, 68, 20, 95, 22, 47, 181, 162, 87, 53, 182,
     163, 89, 54, 62, 21, 88, 10, 123, 122, 120, 121, 211, 212)
-  val EXIT_TYPES = List(11, 52, 197, 51, 124, 198)
-  val SWITCH_TYPES: List[Int] = List(103) ::: EXIT_TYPES
+  val NORMAL_EXIT_TYPES = List(11, 52, 197)
+  val EXIT_TYPES: List[Int] = NORMAL_EXIT_TYPES ::: List(51, 124, 198)
+  val SWITCH_TYPES: List[Int] = EXIT_TYPES ::: List(103)
 
   private def createStream(fromFile: String): MappedByteBuffer = {
     val file = new File(fromFile)
@@ -36,6 +38,12 @@ object WadParser {
     dataBytes
   }
 
+  private def extractLumps(byteStream: MappedByteBuffer, data: ByteBuffer): List[Lump] =
+    byteStream.remaining() match {
+      case 0 => List()
+      case _ => extractLump(byteStream, data) +: extractLumps(byteStream, data)
+    }
+
   private def extractLump(byteStream: MappedByteBuffer, data: ByteBuffer): Lump = {
     val filePos = byteStream.getInt() - HEADER_SIZE
     val size = byteStream.getInt()
@@ -52,39 +60,46 @@ object WadParser {
     }
   }
 
-  private def extractLumps(byteStream: MappedByteBuffer, data: ByteBuffer): List[Lump] =
-    byteStream.remaining() match {
-      case 0 => List()
-      case _ => extractLump(byteStream, data) +: extractLumps(byteStream, data)
+  private def createLumpMaps(lumps: List[Lump]): Map[String, Map[String, Lump]] = {
+    var currentLevelName: Option[String] = None
+    var currentLevelLumps: Map[String, Lump] = Map()
+    var lumpMap: Map[String, Map[String, Lump]] = Map()
+    val levelNamePattern = "(E[0-9]M[0-9])".r
+
+    lumps foreach { lump =>
+      lump.name match {
+        case levelNamePattern(levelName) =>
+          if (currentLevelName.isDefined) lumpMap += (currentLevelName.get -> currentLevelLumps)
+          currentLevelName = Some(levelName)
+          currentLevelLumps = Map(lump.name -> lump)
+        case _ =>
+          if (currentLevelName.isDefined) currentLevelLumps += (lump.name -> lump)
+      }
     }
 
-  private def levelNameMatched(currentLevel: Option[Level], levelName: String, name: String,
-                               remainingLumps: List[Lump]): List[Level] = {
-    if (currentLevel.isDefined){
-      List(currentLevel.get) ++ extractLevels(Some(Level(levelName, Map())), remainingLumps.tail, levelName)
-    } else {
-      extractLevels(Some(Level(levelName, Map())), remainingLumps.tail, levelName)
-    }
+    lumpMap + (currentLevelName.get -> currentLevelLumps)
   }
 
-  private def nonLevelNameMatched(currentLevel: Option[Level], name: String, currentLump: Lump,
-                                  remainingLumps: List[Lump]): List[Level] = {
-    if (name == "START"){
-      extractLevels(None, remainingLumps.tail, "START")
-    } else {
-      extractLevels(Some(currentLevel.get.addLump(currentLump)), remainingLumps.tail, name)
-    }
+  private def extractLevels(lumps: List[Lump]): List[Level] = {
+    val lumpMaps = createLumpMaps(lumps)
+    lumpMaps.keys.map(levelName => extractLevel(levelName, lumpMaps(levelName))).toList
   }
 
-  private def extractLevels(currentLevel: Option[Level], remainingLumps: List[Lump], name: String): List[Level] = {
-    val currentLump = remainingLumps.headOption.getOrElse(Lump("FINISH", List()))
-    val pattern = "(E[0-9]M[0-9])".r
-    currentLump.name match {
-      case pattern(levelName) => levelNameMatched(currentLevel, levelName, name, remainingLumps)
-      case "FINISH" => List(currentLevel.get)
-      case _ => nonLevelNameMatched(currentLevel, name, currentLump, remainingLumps)
-    }
+  private def extractLevel(name: String, lumps: Map[String, Lump]): Level = {
+    val vertices = extractVertices(lumps("VERTEXES"))
+    val sectors = extractSectors(lumps("SECTORS"))
+    val sidedefs = extractSidedefs(lumps("SIDEDEFS"), sectors)
+    val linedefs = extractLinedefs(lumps("LINEDEFS"), vertices, sidedefs)
+    val things = extractThings(lumps("THINGS"))
+    val start = extractStart(things)
+    val exit = extractExit(linedefs, start)
+    val quadTree = LineMXQuadTree.createQuadTree(linedefs)
+    val doorSwitches = extractDoorSwitches(linedefs)
+
+    Level(name, linedefs, quadTree, start, exit, doorSwitches)
   }
+
+  private def extractVertices(lump: Lump): List[Vertex] = lump.data.sliding(4, 4).map(extractVertex).toList
 
   private def extractVertex(bytes: List[Byte]): Vertex = {
     val x = ByteBuffer.wrap(bytes.take(2).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
@@ -92,44 +107,7 @@ object WadParser {
     Vertex(x, y)
   }
 
-  private def extractVerticesForLevel(level: Level): List[Vertex] = {
-    val vertexData = level.lumps("VERTEXES").data
-    vertexData.sliding(4, 4).map(extractVertex).toList
-  }
-
-  private def blocksPlayerAndMonsters(flags: Int): Boolean = (flags & 0x0001) == 1
-
-  private def isLift(specialType: Int): Boolean = LIFT_LINEDEF_TYPES.contains(specialType)
-
-  private def extractLine(bytes: List[Byte], vertices: List[Vertex], level: Level): WadLine = {
-    val aIndex = ByteBuffer.wrap(bytes.take(2).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
-    val bIndex = ByteBuffer.wrap(bytes.slice(2, 4).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
-    val flags = ByteBuffer.wrap(bytes.slice(4, 6).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
-    val specialType = ByteBuffer.wrap(bytes.slice(6, 8).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
-    val sectorTag = ByteBuffer.wrap(bytes.slice(8, 10).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
-    val leftSide = ByteBuffer.wrap(bytes.slice(10, 12).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
-    val rightSide = ByteBuffer.wrap(bytes.slice(12, 14).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
-
-    val leftSideDef = if (leftSide == -1) None else Some(level.sideDefs.get(leftSide))
-    val rightSideDef = if (rightSide == -1) None else Some(level.sideDefs.get(rightSide))
-    val leftHeight = leftSideDef.getOrElse(rightSideDef.get).sector.get.floorHeight
-    val rightHeight = rightSideDef.getOrElse(leftSideDef.get).sector.get.floorHeight
-    val heightDifference = abs(leftHeight - rightHeight)
-    val nonTraversable =
-      leftSide == -1 ||
-      rightSide == -1 ||
-      blocksPlayerAndMonsters(flags) ||
-      (heightDifference > 20 && !isLift(specialType))
-
-    WadLine(vertices(aIndex), vertices(bIndex), nonTraversable, Some(sectorTag), Some(specialType),
-      rightSideDef, leftSideDef)
-  }
-
-  private def extractLinesForLevel(level: Level): List[WadLine] = {
-    val vertices = extractVerticesForLevel(level)
-    val linedefs = level.lumps("LINEDEFS").data
-    linedefs.sliding(14, 14).map(extractLine(_, vertices, level)).toList
-  }
+  private def extractSectors(lump: Lump): List[Sector] = (lump.data.sliding(26, 26) map extractSector).toList
 
   private def extractSector(bytes: List[Byte]): Sector = {
     val floorHeight = ByteBuffer.wrap(bytes.take(2).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
@@ -139,48 +117,47 @@ object WadParser {
     Sector(sectorType, tag, floorHeight, ceilingHeight)
   }
 
-  private def extractSectorsForLevel(level: Level): List[Sector] = {
-    val sectorBytes = level.lumps("SECTORS").data
-    (sectorBytes.sliding(26, 26) map extractSector).toList
-  }
+  private def extractSidedefs(lump: Lump, sectors: List[Sector]): List[Sidedef] =
+    lump.data.sliding(30, 30).map(extractSidedef(_, sectors)).toList
 
-  private def extractSideDef(bytes: List[Byte], level: Level): SideDef = {
+  private def extractSidedef(bytes: List[Byte], sectors: List[Sector]): Sidedef = {
     val sectorId = ByteBuffer.wrap(bytes.slice(28, 30).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
-    val sector = level.sectors.get(sectorId)
-    SideDef(sectorId, Some(sector))
+    val sector = sectors(sectorId)
+    Sidedef(sectorId, Some(sector))
   }
 
-  private def extractSideDefsForLevel(level: Level): List[SideDef] = {
-    val sideDefBytes = level.lumps("SIDEDEFS").data
-    sideDefBytes.sliding(30, 30).map(extractSideDef(_, level)).toList
+  private def extractLinedefs(lump: Lump, vertices: List[Vertex], sidedefs: List[Sidedef]): List[Linedef] =
+    lump.data.sliding(14, 14).map(extractLinedef(_, vertices, sidedefs)).toList
+
+  private def extractLinedef(bytes: List[Byte], vertices: List[Vertex], sidedefs: List[Sidedef]): Linedef = {
+    val aIndex = ByteBuffer.wrap(bytes.take(2).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
+    val bIndex = ByteBuffer.wrap(bytes.slice(2, 4).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
+    val flags = ByteBuffer.wrap(bytes.slice(4, 6).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
+    val specialType = ByteBuffer.wrap(bytes.slice(6, 8).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
+    val sectorTag = ByteBuffer.wrap(bytes.slice(8, 10).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
+    val leftSide = ByteBuffer.wrap(bytes.slice(10, 12).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
+    val rightSide = ByteBuffer.wrap(bytes.slice(12, 14).toArray).order(ByteOrder.LITTLE_ENDIAN).getShort().toInt
+
+    val leftSideDef = if (leftSide == -1) None else Some(sidedefs(leftSide))
+    val rightSideDef = if (rightSide == -1) None else Some(sidedefs(rightSide))
+    val leftHeight = leftSideDef.getOrElse(rightSideDef.get).sector.get.floorHeight
+    val rightHeight = rightSideDef.getOrElse(leftSideDef.get).sector.get.floorHeight
+    val heightDifference = abs(leftHeight - rightHeight)
+    val nonTraversable =
+      leftSide == -1 ||
+      rightSide == -1 ||
+      blocksPlayerAndMonsters(flags) ||
+      (heightDifference > 20 && !isLift(specialType))
+
+    Linedef(vertices(aIndex), vertices(bIndex), nonTraversable, Some(sectorTag), Some(specialType),
+      rightSideDef, leftSideDef)
   }
 
-  private def extractExit(level: Level): Vertex = {
-    val normalExitLines = level.lines.get.find( line => {
-      List(11, 52, 197).contains(line.lineType.get)
-    })
-    normalExitLines match {
-      case Some(x) => x.a
-      case _ => level.playerStart.get
-    }
-  }
+  private def blocksPlayerAndMonsters(flags: Int): Boolean = (flags & 0x0001) == 1
 
-  def doorLinedefs(level: Level): List[DoorSwitch] = {
-    val doorLines = level.lines.getOrElse(List()).filter(line => SWITCH_TYPES.contains(line.lineType.getOrElse(-1)))
-    doorLines map DoorSwitch.fromWadLine
-  }
+  private def isLift(specialType: Int): Boolean = LIFT_LINEDEF_TYPES.contains(specialType)
 
-  private def addMiscDataToLevel(level: Level): Level = {
-    //TODO: make this better - only create level once.  Need to do sectors first, then sidedefs, then linedefs
-    val levelWithSectors = level.setSectors(extractSectorsForLevel(level))
-    val levelWithSideDefs = levelWithSectors.setSideDefs(extractSideDefsForLevel(levelWithSectors))
-    val levelWithLines = levelWithSideDefs.setLines(extractLinesForLevel(levelWithSideDefs))
-
-    levelWithLines.setPlayerStart(extractPlayerStart(levelWithLines))
-    levelWithLines.setExit(extractExit(levelWithLines))
-    levelWithLines.setDoorSwitches(doorLinedefs(levelWithLines))
-    levelWithLines
-  }
+  private def extractThings(lump: Lump): List[Thing] = (lump.data.sliding(10, 10) map extractThing).toList
 
   private def extractThing(bytes: List[Byte]): Thing = {
     val position = extractVertex(bytes.take(4))
@@ -189,21 +166,29 @@ object WadParser {
     Thing(position, angle, doomId)
   }
 
-  private def extractPlayerStart(level: Level): Vertex = {
-    val thingsLump = level.lumps("THINGS").data
-    val things = (thingsLump.sliding(10, 10) map extractThing).toList
-    things.find(_.doomId == 1).get.position
+  private def extractStart(things: List[Thing]): Vertex = things.find(_.doomId == 1).get.position
+
+  private def extractExit(linedefs: List[Linedef], start: Vertex): Vertex = {
+    val normalExitLines = linedefs.find( line => NORMAL_EXIT_TYPES.contains(line.lineType.get))
+    normalExitLines match {
+      case Some(x) => x.midpoint
+      case _ => start
+    }
   }
 
-  def createWad(fromFile: String = "/home/neil/Downloads/doom1.wad"): Wad = {
+  private def extractDoorSwitches(linedefs: List[Linedef]): List[DoorSwitch] = {
+    val doorLines = linedefs.filter(line => SWITCH_TYPES.contains(line.lineType.getOrElse(-1)))
+    doorLines map DoorSwitch.fromWadLine
+  }
+
+  def createWad(fromFile: String = WAD_LOCATION): Wad = {
     val byteStream = createStream(fromFile)
     val wadType = extractWadType(byteStream)
-    val numLumps = extractNumLumps(byteStream)
+    val numLumps = extractNumLumps(byteStream)  // Although we don't use this, we still have to pop it off the byteStream
     val data = extractData(byteStream)
     val lumps = extractLumps(byteStream, data)
-    val levels = extractLevels(None, lumps, "START").map(addMiscDataToLevel)
-    levels foreach {level => level.quadTree = Some(LineMXQuadTree.createQuadTree(level))}
+    val levels = extractLevels(lumps).sortBy(_.name)
 
-    Wad(wadType, numLumps, levels)
+    Wad(wadType, levels)
   }
 }
