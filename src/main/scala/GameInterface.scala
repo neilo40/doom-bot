@@ -4,7 +4,8 @@ import Protocols._
 import math._
 
 object GameInterface {
-  val baseUrl = "http://localhost:6001/api"
+  val baseUrl = "http://192.168.44.50:6002/api"
+  //val baseUrl = "http://localhost:6001/api"
   val enemyIds = List(3004, 3001, 9, 3002)  // 2035=barrel
   val threatThreshold = 400
   val doorThreshold = 150
@@ -32,6 +33,17 @@ object GameInterface {
     jsonAst.convertTo[Player]
   }
 
+  def getPlayers: List[Player] = {
+    val playersJsonString = get("players").body
+    val jsonAst = playersJsonString.parseJson
+    jsonAst.convertTo[List[Player]]
+  }
+
+  def selectWeapon(num: Int): Unit = {
+    val jsonData = "{\"type\": \"switch-weapon\", \"amount\": " + num + "}"
+    post("player/actions", jsonData)
+  }
+
   def move(amount: Int): Unit = {
     val direction = if (amount > 0) "forward" else "backward"
     val abs_amount = abs(amount)
@@ -57,6 +69,19 @@ object GameInterface {
   def turn(angle: Int): Unit = {
     val jsonData = "{\"target_angle\": " + angle + "}"
     post("player/turn", jsonData)
+  }
+
+  //Use the shitty turn api to head towards a target
+  def turnTowards(player: Player, targetPos: Vertex): Unit = {
+    val targetAngle = toDegrees(atan2(targetPos.x - player.position.x,
+      player.position.y - targetPos.y)) - 90
+    val normalisedAngle = if (targetAngle < 0) targetAngle + 360 else targetAngle
+    var remaining = normalisedAngle - player.angle
+    if (remaining < 0) remaining = remaining + 360
+    val direction = if (remaining < 180) "turn-left" else "turn-right"
+    //TODO: move by a smaller amount when the remaining angle is small
+    val jsonData = "{\"type\": \"" + direction + "\", \"amount\": 25}"
+    post("player/actions", jsonData)
   }
 
   def canMoveTo(player: Player, target: Vertex): Boolean = {
@@ -101,6 +126,10 @@ object GameInterface {
     val resp = Http(s"$baseUrl/world/objects").param("distance", distance.toString).asString
     resp.body.parseJson.convertTo[List[Object]]
   }
+
+  def getAllShells: List[Object] = getAllObjects filter(_.typeId == 2008)
+
+  def getAllShotguns: List[Object] = getAllObjects filter(_.typeId == 2001)
 
   def getAllObjects: List[Object] = get("world/objects").body.parseJson.convertTo[List[Object]]
 
